@@ -17,6 +17,7 @@ This bot comes with **music playback**, **Roblox verification**, **FiveM verific
 - **📊 Owo Economy Games** — Slots, Coinflip, Daily rewards with coin system
 - **📆 Polls & Utilities** — Create polls, reminders, server info, and user info
 - **📌 FiveM Server Status** — Live server status updates with `!fivemserverlive`
+- **🔧 Slash Commands** — Modern `/command` interface for moderation and management alongside traditional prefix commands
 - **🚀 Future Plans** — More useful and better commands will be added soon!
 
 ---
@@ -63,6 +64,32 @@ python bot.py
 
 ---
 
+## 🔧 Slash Commands (New Feature ✨)
+
+The bot now supports modern **slash commands** alongside traditional prefix commands for better user experience!
+
+### 📝 Moderation Slash Commands:
+- `/kick @user [reason]` - Kick users with reason logging
+- `/ban @user [reason]` - Ban users with reason logging
+- `/clear <amount>` - Bulk delete messages
+- `/unban <username/id>` - Remove users from ban list
+- `/setnick <new_name> [@user]` - Set user nicknames
+- `/role_give @user @role` - Give role to user
+- `/role_remove @user @role` - Remove role from user
+
+### 🔊 Voice Channel Management:
+- `/move_all [channel]` - Move all members to a voice channel
+- `/move_user @user [channel]` - Move specific user to voice channel
+- `/moveme <channel>` - Move yourself to a voice channel
+- `/move_role @role [channel]` - Move all members with a role to voice channel
+
+### ℹ️ Utility Slash Commands:
+- `/invite` - Get bot invite link for your server
+
+> ⚠️ **Note:** Most slash commands require **bot owner** or **server owner** permissions for security.
+
+---
+
 ## 🎵 Music Commands
 - `!play <song>` — Play a song or add to queue 
 - `!skip` — Skip current song 
@@ -100,7 +127,7 @@ python bot.py
 - **Roblox**: `!verifyroblox <username>` (Working ✅) 
 - **FiveM**: `!verifyfivem <username>` (Working ✅) 
 - **FiveM Server Status**: `!fivemserverlive [#channel]`
-- **SA:MP Status**: `!sampstatus` - Check SA:MP server status (New ✨. But Under the maintenance ❌)
+- **SA:MP Status**: `!sampstatus` - Check SA:MP server status (But Under the maintenance ❌)
 - **SA:MP**: `!verifysamp <username>` (Under Maintenance ❌) 
 - **Valorant**: `!verifyvalo <Username#Tag>` (Under Maintenance ❌) 
 
