@@ -8,6 +8,7 @@ import datetime
 import logging
 from samp_query import Client
 from discord.ext import commands
+from discord import app_commands
 from urllib.parse import quote
 import json
 import requests
@@ -319,6 +320,32 @@ class MyBot(commands.Bot):
         """
         beautiful_print(login_msg, "═")
         await self.change_presence(activity=discord.Game(name=f"Music | {PREFIX}help"))
+        
+        # Sync slash commands with better error handling
+        try:
+            synced = await self.tree.sync()
+            beautiful_print(f"✅ Synced {len(synced)} slash commands", "─")
+        except Exception as e:
+            beautiful_print(f"❌ Failed to sync slash commands: {e}", "!")
+            # Try to sync with individual command error handling
+            await self.sync_commands_with_retry()
+    
+    async def sync_commands_with_retry(self):
+        """Sync commands individually to identify problematic ones"""
+        beautiful_print("🔄 Attempting to sync commands individually...", "─")
+        successful = 0
+        failed = 0
+        
+        for command in self.tree.get_commands():
+            try:
+                await self.tree.sync_command(command)
+                beautiful_print(f"✅ Synced: /{command.name}", "─")
+                successful += 1
+            except Exception as e:
+                beautiful_print(f"❌ Failed to sync /{command.name}: {e}", "!")
+                failed += 1
+        
+        beautiful_print(f"📊 Sync Results: {successful} successful, {failed} failed", "─")
 
 bot = MyBot(command_prefix=PREFIX, intents=intents, help_command=None)
 
@@ -412,6 +439,661 @@ async def start_idle_timer(guild_id):
             print(f"Error in idle timer: {e}")
     
     idle_timers[guild_id] = asyncio.create_task(idle_task())
+
+# --- Slash Commands ---
+
+@bot.tree.command(name="sc", description="Get bot information and GitHub link")
+async def sc(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="Discord MultiBot",
+        description="A multipurpose Discord bot with music, verification, and moderation tools",
+        color=discord.Color.blue()
+    )
+    embed.add_field(
+        name="GitHub Repository",
+        value="[Visit GitHub](https://github.com/y-nabeelxd/Discord-MultiBot-py)",
+        inline=False
+    )
+    view = discord.ui.View()
+    view.add_item(discord.ui.Button(
+        label="Visit GitHub",
+        style=discord.ButtonStyle.link,
+        url="https://github.com/y-nabeelxd/Discord-MultiBot-py"
+    ))
+    await interaction.response.send_message(embed=embed, view=view)
+
+def is_owner_or_server_owner():
+    async def predicate(interaction: discord.Interaction):
+        return interaction.user.id == BOT_OWNER or interaction.user == interaction.guild.owner
+    return app_commands.check(predicate)
+
+@bot.tree.command(name="kick", description="Kick a user from the server")
+@app_commands.describe(user="The user to kick", reason="Reason for kicking")
+@is_owner_or_server_owner()
+async def slash_kick(interaction: discord.Interaction, user: discord.Member, reason: str = "No reason provided"):
+    if user == interaction.user:
+        await interaction.response.send_message("You cannot kick yourself!", ephemeral=True)
+        return
+    if user == interaction.guild.owner:
+        await interaction.response.send_message("You cannot kick the server owner!", ephemeral=True)
+        return
+    if user.top_role >= interaction.user.top_role and interaction.user != interaction.guild.owner:
+        await interaction.response.send_message("You cannot kick someone with a higher or equal role!", ephemeral=True)
+        return
+    
+    embed = discord.Embed(
+        title="👢 Member Kicked",
+        description=f"{user.mention} has been kicked by {interaction.user.mention}",
+        color=discord.Color.orange()
+    )
+    embed.add_field(name="Reason", value=reason, inline=False)
+    
+    try:
+        dm_embed = discord.Embed(
+            title=f"👢 You've been kicked from {interaction.guild.name}",
+            color=discord.Color.orange()
+        )
+        dm_embed.add_field(name="Reason", value=reason, inline=False)
+        await user.send(embed=dm_embed)
+    except:
+        pass
+    
+    await user.kick(reason=reason)
+    await interaction.response.send_message(embed=embed)
+
+@bot.tree.command(name="ban", description="Ban a user from the server")
+@app_commands.describe(user="The user to ban", reason="Reason for banning")
+@is_owner_or_server_owner()
+async def slash_ban(interaction: discord.Interaction, user: discord.Member, reason: str = "No reason provided"):
+    if user == interaction.user:
+        await interaction.response.send_message("You cannot ban yourself!", ephemeral=True)
+        return
+    if user == interaction.guild.owner:
+        await interaction.response.send_message("You cannot ban the server owner!", ephemeral=True)
+        return
+    if user.top_role >= interaction.user.top_role and interaction.user != interaction.guild.owner:
+        await interaction.response.send_message("You cannot ban someone with a higher or equal role!", ephemeral=True)
+        return
+    
+    embed = discord.Embed(
+        title="🔨 Member Banned",
+        description=f"{user.mention} has been banned by {interaction.user.mention}",
+        color=discord.Color.red()
+    )
+    embed.add_field(name="Reason", value=reason, inline=False)
+    
+    try:
+        dm_embed = discord.Embed(
+            title=f"🔨 You've been banned from {interaction.guild.name}",
+            color=discord.Color.red()
+        )
+        dm_embed.add_field(name="Reason", value=reason, inline=False)
+        await user.send(embed=dm_embed)
+    except:
+        pass
+    
+    await user.ban(reason=reason)
+    await interaction.response.send_message(embed=embed)
+
+@bot.tree.command(name="clear", description="Clear messages from the channel")
+@app_commands.describe(amount="Number of messages to clear")
+@is_owner_or_server_owner()
+async def slash_clear(interaction: discord.Interaction, amount: int):
+    if amount <= 0 or amount > 100:
+        await interaction.response.send_message("Please provide a number between 1 and 100.", ephemeral=True)
+        return
+    
+    await interaction.response.defer()
+    deleted = await interaction.channel.purge(limit=amount + 1)  # +1 to include the command message
+    
+    embed = discord.Embed(
+        title="🗑️ Messages Cleared",
+        description=f"Deleted {len(deleted) - 1} messages.",
+        color=discord.Color.green()
+    )
+    await interaction.followup.send(embed=embed, delete_after=5)
+
+@bot.tree.command(name="invite", description="Get the bot invite link")
+async def slash_invite(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="🤖 Bot Invite",
+        description="Invite this bot to your server!",
+        color=discord.Color.blue()
+    )
+    embed.add_field(
+        name="Invite Link",
+        value=f"[Click here to invite](https://discord.com/oauth2/authorize?client_id={bot.user.id}&permissions=8&scope=bot%20applications.commands)",
+        inline=False
+    )
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+@bot.tree.command(name="move_all", description="Move all members to a voice channel")
+@app_commands.describe(channel="The voice channel to move everyone to")
+@is_owner_or_server_owner()
+async def slash_move_all(interaction: discord.Interaction, channel: discord.VoiceChannel = None):
+    if not channel and not interaction.user.voice:
+        await interaction.response.send_message("You are not in a voice channel! Please specify a channel or join one.", ephemeral=True)
+        return
+    
+    target_channel = channel or interaction.user.voice.channel
+    
+    # Send confirmation message
+    await interaction.response.send_message(f"Are you sure that you want to move all users to {target_channel.mention}? Type **(y)** to confirm")
+    
+    def check(m):
+        return m.author == interaction.user and m.content.lower() == 'y' and m.channel == interaction.channel
+    
+    try:
+        msg = await bot.wait_for('message', timeout=30.0, check=check)
+        # Delete the confirmation message
+        try:
+            await msg.delete()
+        except:
+            pass
+        
+        # Edit original message to show progress
+        await interaction.edit_original_response(content="Moving all members...")
+        
+        moved_count = 0
+        for member in interaction.guild.members:
+            if member.voice and member.voice.channel and member.voice.channel != target_channel:
+                try:
+                    await member.move_to(target_channel)
+                    moved_count += 1
+                except:
+                    pass
+        
+        await interaction.edit_original_response(content=f"** All members are being moved!** (Moved {moved_count} members)")
+        
+    except asyncio.TimeoutError:
+        await interaction.edit_original_response(content="Move operation cancelled.")
+
+@bot.tree.command(name="move_user", description="Move a user to a voice channel")
+@app_commands.describe(user="The user to move", channel="The voice channel to move to")
+@is_owner_or_server_owner()
+async def slash_move_user(interaction: discord.Interaction, user: discord.Member, channel: discord.VoiceChannel = None):
+    if not channel and not interaction.user.voice:
+        await interaction.response.send_message("You are not in a voice channel! Please specify a channel or join one.", ephemeral=True)
+        return
+    
+    target_channel = channel or interaction.user.voice.channel
+    
+    if not user.voice:
+        await interaction.response.send_message(f"{user.mention} is not in a voice channel!", ephemeral=True)
+        return
+    
+    try:
+        await user.move_to(target_channel)
+        await interaction.response.send_message(f"Moved {user.mention} to {target_channel.mention}")
+    except Exception as e:
+        await interaction.response.send_message(f"Failed to move user: {e}", ephemeral=True)
+
+@bot.tree.command(name="moveme", description="Move yourself to a voice channel")
+@app_commands.describe(channel="The voice channel to move to")
+@is_owner_or_server_owner()
+async def slash_moveme(interaction: discord.Interaction, channel: discord.VoiceChannel):
+    if not interaction.user.voice:
+        await interaction.response.send_message("You are not in a voice channel!", ephemeral=True)
+        return
+    
+    try:
+        await interaction.user.move_to(channel)
+        await interaction.response.send_message(f"Moved you to {channel.mention}")
+    except Exception as e:
+        await interaction.response.send_message(f"Failed to move: {e}", ephemeral=True)
+
+@bot.tree.command(name="move_role", description="Move all members with a role to a voice channel")
+@app_commands.describe(role="The role to move", channel="The voice channel to move to")
+@is_owner_or_server_owner()
+async def slash_move_role(interaction: discord.Interaction, role: discord.Role, channel: discord.VoiceChannel = None):
+    if not channel and not interaction.user.voice:
+        await interaction.response.send_message("You are not in a voice channel! Please specify a channel or join one.", ephemeral=True)
+        return
+    
+    target_channel = channel or interaction.user.voice.channel
+    
+    # Send confirmation message
+    await interaction.response.send_message(f"Are you sure that you want to move all {role.mention} given users? Type **(y)** to confirm")
+    
+    def check(m):
+        return m.author == interaction.user and m.content.lower() == 'y' and m.channel == interaction.channel
+    
+    try:
+        msg = await bot.wait_for('message', timeout=30.0, check=check)
+        # Delete the confirmation message
+        try:
+            await msg.delete()
+        except:
+            pass
+        
+        # Edit original message to show progress
+        await interaction.edit_original_response(content="Moving the all role members...")
+        
+        moved_count = 0
+        for member in interaction.guild.members:
+            if role in member.roles and member.voice and member.voice.channel != target_channel:
+                try:
+                    await member.move_to(target_channel)
+                    moved_count += 1
+                except:
+                    pass
+        
+        await interaction.edit_original_response(content=f"** All {role.mention} members are being moved!** (Moved {moved_count} members)")
+        
+    except asyncio.TimeoutError:
+        await interaction.edit_original_response(content="Move operation cancelled.")
+
+@bot.tree.command(name="role_give", description="Give a role to a user")
+@app_commands.describe(user="The user to give the role to", role="The role to give")
+@is_owner_or_server_owner()
+async def slash_role_give(interaction: discord.Interaction, user: discord.Member, role: discord.Role):
+    if role in user.roles:
+        await interaction.response.send_message(f"{user.mention} already has the {role.mention} role!", ephemeral=True)
+        return
+    
+    try:
+        await user.add_roles(role)
+        embed = discord.Embed(
+            title="➕ Role Added",
+            description=f"{role.mention} has been added to {user.mention}",
+            color=role.color
+        )
+        await interaction.response.send_message(embed=embed)
+    except Exception as e:
+        await interaction.response.send_message(f"Failed to add role: {e}", ephemeral=True)
+
+@bot.tree.command(name="role_remove", description="Remove a role from a user")
+@app_commands.describe(user="The user to remove the role from", role="The role to remove")
+@is_owner_or_server_owner()
+async def slash_role_remove(interaction: discord.Interaction, user: discord.Member, role: discord.Role):
+    if role not in user.roles:
+        await interaction.response.send_message(f"{user.mention} doesn't have the {role.mention} role!", ephemeral=True)
+        return
+    
+    try:
+        await user.remove_roles(role)
+        embed = discord.Embed(
+            title="➖ Role Removed",
+            description=f"{role.mention} has been removed from {user.mention}",
+            color=role.color
+        )
+        await interaction.response.send_message(embed=embed)
+    except Exception as e:
+        await interaction.response.send_message(f"Failed to remove role: {e}", ephemeral=True)
+
+@bot.tree.command(name="setnick", description="Set a user's nickname")
+@app_commands.describe(new_name="The new nickname", user="The user to set nickname for")
+@is_owner_or_server_owner()
+async def slash_setnick(interaction: discord.Interaction, new_name: str, user: discord.Member = None):
+    target_user = user or interaction.user
+    
+    try:
+        old_nick = target_user.display_name
+        await target_user.edit(nick=new_name)
+        embed = discord.Embed(
+            title="📝 Nickname Changed",
+            description=f"{target_user.mention}'s nickname has been updated",
+            color=discord.Color.blue()
+        )
+        embed.add_field(name="Before", value=old_nick, inline=True)
+        embed.add_field(name="After", value=new_name, inline=True)
+        await interaction.response.send_message(embed=embed)
+    except Exception as e:
+        await interaction.response.send_message(f"Failed to change nickname: {e}", ephemeral=True)
+
+@bot.tree.command(name="unban", description="Unban a user")
+@app_commands.describe(user="The username or ID of the user to unban")
+@is_owner_or_server_owner()
+async def slash_unban(interaction: discord.Interaction, user: str):
+    try:
+        banned_users = [ban async for ban in interaction.guild.bans()]
+        
+        for ban_entry in banned_users:
+            if user.lower() in ban_entry.user.name.lower() or user == str(ban_entry.user.id):
+                await interaction.guild.unban(ban_entry.user)
+                embed = discord.Embed(
+                    title="✅ User Unbanned",
+                    description=f"{ban_entry.user.mention} has been unbanned by {interaction.user.mention}",
+                    color=discord.Color.green()
+                )
+                await interaction.response.send_message(embed=embed)
+                return
+        
+        await interaction.response.send_message("User not found in ban list!", ephemeral=True)
+    except Exception as e:
+        await interaction.response.send_message(f"Failed to unban user: {e}", ephemeral=True)
+
+# --- Music System ---
+
+class SongSelect(discord.ui.Select):
+    def __init__(self, results, ctx):
+        self.results = results
+        self.ctx = ctx
+        
+        options = [
+            discord.SelectOption(
+                label=f"{idx+1}. {video['title'][:90]}",
+                description=f"{video.get('duration', 'N/A')}",
+                value=str(idx)
+            ) for idx, video in enumerate(results[:10])
+        ]
+        
+        super().__init__(
+            placeholder="Select a song to play...",
+            min_values=1,
+            max_values=1,
+            options=options
+        )
+    
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user != self.ctx.author:
+            return await interaction.response.send_message("You didn't request this song selection!", ephemeral=True)
+        
+        selected = int(self.values[0])
+        video_url = self.results[selected]['url']
+        song_title = self.results[selected]['title']
+        
+        await interaction.response.defer()
+        await interaction.message.delete()
+        
+        voice_client = self.ctx.voice_client
+        
+        if self.ctx.guild.id not in song_queues:
+            song_queues[self.ctx.guild.id] = []
+        
+        if voice_client.is_playing() or voice_client.is_paused():
+            song_queues[self.ctx.guild.id].append({'url': video_url, 'title': song_title})
+            await self.ctx.send(f"Added to queue: **{song_title}**")
+        else:
+            await play_song(self.ctx, video_url, song_title)
+
+class SongSelectView(discord.ui.View):
+    def __init__(self, results, ctx, timeout=60):
+        super().__init__(timeout=timeout)
+        self.add_item(SongSelect(results, ctx))
+    
+    async def on_timeout(self):
+        try:
+            await self.message.delete()
+        except:
+            pass
+
+class ControlButtons(discord.ui.View):
+    def __init__(self, ctx):
+        super().__init__(timeout=None)
+        self.ctx = ctx
+    
+    @discord.ui.button(label="Pause", style=discord.ButtonStyle.primary, emoji="⏸️")
+    async def pause_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        voice_client = interaction.guild.voice_client
+        if voice_client and voice_client.is_playing():
+            voice_client.pause()
+            await interaction.response.send_message("⏸ Playback paused", ephemeral=True)
+        else:
+            await interaction.response.send_message("Nothing is playing!", ephemeral=True)
+    
+    @discord.ui.button(label="Resume", style=discord.ButtonStyle.primary, emoji="▶️")
+    async def resume_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        voice_client = interaction.guild.voice_client
+        if voice_client and voice_client.is_paused():
+            voice_client.resume()
+            await interaction.response.send_message("▶ Playback resumed", ephemeral=True)
+        else:
+            await interaction.response.send_message("Playback is not paused!", ephemeral=True)
+    
+    @discord.ui.button(label="Skip", style=discord.ButtonStyle.secondary, emoji="⏭️")
+    async def skip_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        voice_client = interaction.guild.voice_client
+        if voice_client and (voice_client.is_playing() or voice_client.is_paused()):
+            voice_client.stop()
+            await interaction.response.send_message("⏭️ Song skipped", ephemeral=True)
+            await play_next(self.ctx)
+        else:
+            await interaction.response.send_message("Nothing is playing!", ephemeral=True)
+    
+    @discord.ui.button(label="Stop", style=discord.ButtonStyle.danger, emoji="🛑")
+    async def stop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        voice_client = interaction.guild.voice_client
+        if voice_client:
+            if interaction.guild.id in song_queues:
+                song_queues[interaction.guild.id].clear()
+            if interaction.guild.id in current_players:
+                if 'control_message' in current_players[interaction.guild.id]:
+                    try:
+                        await current_players[interaction.guild.id]['control_message'].delete()
+                    except:
+                        pass
+                del current_players[interaction.guild.id]
+            await voice_client.disconnect()
+            await interaction.response.send_message("⏹ Playback stopped and queue cleared", ephemeral=True)
+        else:
+            await interaction.response.send_message("I'm not in a voice channel!", ephemeral=True)
+
+async def play_next(ctx):
+    if ctx.guild.id in song_queues and song_queues[ctx.guild.id]:
+        next_song = song_queues[ctx.guild.id].pop(0)
+        await play_song(ctx, next_song['url'], next_song['title'])
+    else:
+        await start_idle_timer(ctx.guild.id)
+
+async def play_song(ctx, url, title):
+    voice_client = ctx.voice_client
+    
+    if ctx.guild.id in idle_timers:
+        idle_timers[ctx.guild.id].cancel()
+    
+    try:
+        player = await YTDLSource.from_url(url, loop=bot.loop, stream=True)
+        
+        current_players[ctx.guild.id] = {
+            'voice_client': voice_client,
+            'player': player,
+            'ctx': ctx,
+            'last_activity': time.time()
+        }
+        
+        embed = discord.Embed(
+            title="🎵 Now Playing",
+            description=f"[{player.title}]({url})",
+            color=discord.Color.green()
+        )
+        embed.set_thumbnail(url=player.thumbnail)
+        
+        if player.duration:
+            embed.add_field(name="Duration", value=player.duration, inline=True)
+            
+        view = ControlButtons(ctx)
+        control_message = await ctx.send(embed=embed, view=view)
+        
+        current_players[ctx.guild.id]['control_message'] = control_message
+        
+        def after_playing(error):
+            if error:
+                print(f'Player error: {error}')
+            asyncio.run_coroutine_threadsafe(play_next(ctx), bot.loop)
+            
+        voice_client.play(player, after=after_playing)
+        
+    except Exception as e:
+        await ctx.send(f"Error playing song: {e}")
+        await play_next(ctx)
+
+def search_youtube(query):
+    search_url = f"https://www.youtube.com/results?search_query={quote(query)}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+    try:
+        response = requests.get(search_url, headers=headers)
+        if response.status_code != 200:
+            print("Failed to fetch YouTube results")
+            return []
+        
+        html = response.text
+        initial_data = {}
+        try:
+            start = html.index('var ytInitialData = ') + len('var ytInitialData = ')
+            end = html.index('};</script>', start) + 1
+            json_str = html[start:end]
+            initial_data = json.loads(json_str)
+        except (ValueError, json.JSONDecodeError) as e:
+            print("Failed to parse YouTube data:", e)
+            return []
+        
+        videos = []
+        contents = initial_data.get('contents', {}).get('twoColumnSearchResultsRenderer', {}).get('primaryContents', {}).get('sectionListRenderer', {}).get('contents', [{}])[0].get('itemSectionRenderer', {}).get('contents', [])
+        
+        for content in contents:
+            if 'videoRenderer' in content:
+                video = content['videoRenderer']
+                video_id = video.get('videoId')
+                title = video.get('title', {}).get('runs', [{}])[0].get('text')
+                duration_text = video.get('lengthText', {}).get('simpleText', '')
+                
+                if video_id and title:
+                    videos.append({
+                        'title': title,
+                        'url': f'https://www.youtube.com/watch?v={video_id}',
+                        'duration': duration_text,
+                        'thumbnail': f'https://img.youtube.com/vi/{video_id}/hqdefault.jpg'
+                    })
+                if len(videos) >= 10:
+                    break
+        return videos
+    except Exception as e:
+        print(f"Error searching YouTube: {e}")
+        return []
+
+@bot.command(aliases=['p'])
+async def play(ctx, *, query: str):
+    """Play a song or add to queue. Usage: !play <song name/url>"""
+    voice_client = ctx.voice_client
+    
+    if not ctx.author.voice:
+        await ctx.send("You need to be in a voice channel to play music!")
+        return
+    
+    if voice_client and voice_client.is_connected():
+        if voice_client.channel != ctx.author.voice.channel:
+            await voice_client.move_to(ctx.author.voice.channel)
+    else:
+        voice_client = await ctx.author.voice.channel.connect()
+    
+    if ctx.guild.id in idle_timers:
+        idle_timers[ctx.guild.id].cancel()
+    
+    results = search_youtube(query)
+    if not results:
+        await ctx.send("No results found!")
+        return
+    
+    embed = discord.Embed(title="🔍 Search Results", description=f"Results for: {query}", color=0x00ff00)
+    for idx, video in enumerate(results[:10], 1):
+        embed.add_field(
+            name=f"{idx}. {video['title']}",
+            value=f"Duration: {video.get('duration', 'N/A')}",
+            inline=False
+        )
+    
+    view = SongSelectView(results, ctx)
+    view.message = await ctx.send(embed=embed, view=view)
+
+@bot.command()
+async def skip(ctx):
+    """Skip the current song. Usage: !skip"""
+    voice_client = ctx.voice_client
+    if voice_client and (voice_client.is_playing() or voice_client.is_paused()):
+        voice_client.stop()
+        await ctx.send("⏭️ Song skipped")
+        await play_next(ctx)
+    else:
+        await ctx.send("Nothing is playing to skip!")
+
+@bot.command()
+async def queue(ctx):
+    """Show the current queue. Usage: !queue"""
+    if ctx.guild.id in song_queues and song_queues[ctx.guild.id]:
+        queue_list = [f"{idx+1}. {song['title']}" for idx, song in enumerate(song_queues[ctx.guild.id])]
+        embed = discord.Embed(
+            title="🎶 Current Queue",
+            description="\n".join(queue_list),
+            color=discord.Color.blue()
+        )
+        await ctx.send(embed=embed)
+    else:
+        await ctx.send("The queue is empty.")
+
+@bot.command()
+async def clearqueue(ctx):
+    """Clear the current queue. Usage: !clearqueue"""
+    if ctx.guild.id in song_queues:
+        song_queues[ctx.guild.id].clear()
+        await ctx.send("Queue cleared!")
+    else:
+        await ctx.send("The queue is already empty.")
+
+@bot.command()
+async def pause(ctx):
+    """Pause the current song. Usage: !pause"""
+    voice_client = ctx.voice_client
+    if voice_client and voice_client.is_playing():
+        voice_client.pause()
+        await ctx.send("⏸ Playback paused")
+    else:
+        await ctx.send("Nothing is playing!")
+
+@bot.command()
+async def resume(ctx):
+    """Resume the current song. Usage: !resume"""
+    voice_client = ctx.voice_client
+    if voice_client and voice_client.is_paused():
+        voice_client.resume()
+        await ctx.send("▶ Playback resumed")
+    else:
+        await ctx.send("Playback is not paused!")
+
+@bot.command()
+async def stop(ctx):
+    """Stop playback and clear queue. Usage: !stop"""
+    voice_client = ctx.voice_client
+    if voice_client:
+        if ctx.guild.id in song_queues:
+            song_queues[ctx.guild.id].clear()
+        if ctx.guild.id in current_players:
+            if 'control_message' in current_players[ctx.guild.id]:
+                try:
+                    await current_players[ctx.guild.id]['control_message'].delete()
+                except:
+                    pass
+            del current_players[ctx.guild.id]
+        await voice_client.disconnect()
+        await ctx.send("⏹ Playback stopped and queue cleared")
+    else:
+        await ctx.send("I'm not in a voice channel!")
+
+@bot.command()
+async def leave(ctx):
+    """Make the bot leave the voice channel. Usage: !leave"""
+    voice_client = ctx.voice_client
+    if voice_client:
+        if ctx.guild.id in PERMA_VC:
+            del PERMA_VC[ctx.guild.id]
+            
+        if ctx.guild.id in song_queues:
+            song_queues[ctx.guild.id].clear()
+        if ctx.guild.id in current_players:
+            if 'control_message' in current_players[ctx.guild.id]:
+                try:
+                    await current_players[ctx.guild.id]['control_message'].delete()
+                except:
+                    pass
+            del current_players[ctx.guild.id]
+        await voice_client.disconnect()
+        await ctx.send("⏹ Playback stopped and queue cleared")
+    else:
+        await ctx.send("I'm not in a voice channel!")
+
+# --- Verification Commands ---
 
 class FiveMVerificationView(discord.ui.View):
     """View for FiveM verification confirmation"""
@@ -810,6 +1492,29 @@ async def sampstatus(ctx):
     except Exception as e:
         await ctx.send(f"🔴 Error checking server status: {str(e)}")
 
+class RobloxConfirmationView(discord.ui.View):
+    def __init__(self, ctx, profile):
+        super().__init__(timeout=300)
+        self.ctx = ctx
+        self.profile = profile
+        self.confirmed = None
+    
+    @discord.ui.button(label="Yes, this is me", style=discord.ButtonStyle.success)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user != self.ctx.author:
+            return await interaction.response.send_message("You're not the one verifying!", ephemeral=True)
+        self.confirmed = True
+        await interaction.response.defer()
+        self.stop()
+    
+    @discord.ui.button(label="No, cancel", style=discord.ButtonStyle.danger)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user != self.ctx.author:
+            return await interaction.response.send_message("You're not the one verifying!", ephemeral=True)
+        self.confirmed = False
+        await interaction.response.send_message("Verification cancelled.", ephemeral=True)
+        self.stop()
+
 @bot.command()
 async def verifyroblox(ctx, *, username: str):
     """Verify your Roblox account. Usage: !verifyroblox <username>"""
@@ -1075,333 +1780,173 @@ async def verifysamp(ctx, *, playername: str):
     except Exception as e:
         await msg.edit(content=f"❌ An error occurred: {str(e)}")
 
-class SongSelect(discord.ui.Select):
-    def __init__(self, results, ctx):
-        self.results = results
-        self.ctx = ctx
-        
-        options = [
-            discord.SelectOption(
-                label=f"{idx+1}. {video['title'][:90]}",
-                description=f"{video.get('duration', 'N/A')}",
-                value=str(idx)
-            ) for idx, video in enumerate(results[:10])
-        ]
-        
-        super().__init__(
-            placeholder="Select a song to play...",
-            min_values=1,
-            max_values=1,
-            options=options
-        )
-    
-    async def callback(self, interaction: discord.Interaction):
-        if interaction.user != self.ctx.author:
-            return await interaction.response.send_message("You didn't request this song selection!", ephemeral=True)
-        
-        selected = int(self.values[0])
-        video_url = self.results[selected]['url']
-        song_title = self.results[selected]['title']
-        
-        await interaction.response.defer()
-        await interaction.message.delete()
-        
-        voice_client = self.ctx.voice_client
-        
-        if self.ctx.guild.id not in song_queues:
-            song_queues[self.ctx.guild.id] = []
-        
-        if voice_client.is_playing() or voice_client.is_paused():
-            song_queues[self.ctx.guild.id].append({'url': video_url, 'title': song_title})
-            await self.ctx.send(f"Added to queue: **{song_title}**")
-        else:
-            await play_song(self.ctx, video_url, song_title)
+# --- Moderation Commands ---
 
-class SongSelectView(discord.ui.View):
-    def __init__(self, results, ctx, timeout=60):
-        super().__init__(timeout=timeout)
-        self.add_item(SongSelect(results, ctx))
-    
-    async def on_timeout(self):
-        try:
-            await self.message.delete()
-        except:
-            pass
-
-class ControlButtons(discord.ui.View):
-    def __init__(self, ctx):
-        super().__init__(timeout=None)
-        self.ctx = ctx
-    
-    @discord.ui.button(label="Pause", style=discord.ButtonStyle.primary, emoji="⏸️")
-    async def pause_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        voice_client = interaction.guild.voice_client
-        if voice_client and voice_client.is_playing():
-            voice_client.pause()
-            await interaction.response.send_message("⏸ Playback paused", ephemeral=True)
-        else:
-            await interaction.response.send_message("Nothing is playing!", ephemeral=True)
-    
-    @discord.ui.button(label="Resume", style=discord.ButtonStyle.primary, emoji="▶️")
-    async def resume_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        voice_client = interaction.guild.voice_client
-        if voice_client and voice_client.is_paused():
-            voice_client.resume()
-            await interaction.response.send_message("▶ Playback resumed", ephemeral=True)
-        else:
-            await interaction.response.send_message("Playback is not paused!", ephemeral=True)
-    
-    @discord.ui.button(label="Skip", style=discord.ButtonStyle.secondary, emoji="⏭️")
-    async def skip_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        voice_client = interaction.guild.voice_client
-        if voice_client and (voice_client.is_playing() or voice_client.is_paused()):
-            voice_client.stop()
-            await interaction.response.send_message("⏭️ Song skipped", ephemeral=True)
-            await play_next(self.ctx)
-        else:
-            await interaction.response.send_message("Nothing is playing!", ephemeral=True)
-    
-    @discord.ui.button(label="Stop", style=discord.ButtonStyle.danger, emoji="🛑")
-    async def stop_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        voice_client = interaction.guild.voice_client
-        if voice_client:
-            if interaction.guild.id in song_queues:
-                song_queues[interaction.guild.id].clear()
-            if interaction.guild.id in current_players:
-                if 'control_message' in current_players[interaction.guild.id]:
-                    try:
-                        await current_players[interaction.guild.id]['control_message'].delete()
-                    except:
-                        pass
-                del current_players[interaction.guild.id]
-            await voice_client.disconnect()
-            await interaction.response.send_message("⏹ Playback stopped and queue cleared", ephemeral=True)
-        else:
-            await interaction.response.send_message("I'm not in a voice channel!", ephemeral=True)
-
-async def play_next(ctx):
-    if ctx.guild.id in song_queues and song_queues[ctx.guild.id]:
-        next_song = song_queues[ctx.guild.id].pop(0)
-        await play_song(ctx, next_song['url'], next_song['title'])
-    else:
-        await start_idle_timer(ctx.guild.id)
-
-async def play_song(ctx, url, title):
-    voice_client = ctx.voice_client
-    
-    if ctx.guild.id in idle_timers:
-        idle_timers[ctx.guild.id].cancel()
-    
+@bot.command()
+@commands.has_permissions(ban_members=True)
+async def ban(ctx, member: discord.Member, *, reason="No reason provided"):
+    """Ban a member from the server. Usage: !ban @user [reason]"""
     try:
-        player = await YTDLSource.from_url(url, loop=bot.loop, stream=True)
-        
-        current_players[ctx.guild.id] = {
-            'voice_client': voice_client,
-            'player': player,
-            'ctx': ctx,
-            'last_activity': time.time()
+        await member.ban(reason=reason)
+        embed = discord.Embed(
+            title="🔨 Member Banned",
+            description=f"{member.mention} has been banned by {ctx.author.mention}",
+            color=discord.Color.red()
+        )
+        embed.add_field(name="Reason", value=reason)
+        await ctx.send(embed=embed)
+    except Exception as e:
+        await ctx.send(f"❌ Failed to ban member: {e}")
+
+@bot.command()
+@commands.has_permissions(kick_members=True)
+async def kick(ctx, member: discord.Member, *, reason="No reason provided"):
+    """Kick a member from the server. Usage: !kick @user [reason]"""
+    try:
+        await member.kick(reason=reason)
+        embed = discord.Embed(
+            title="👢 Member Kicked",
+            description=f"{member.mention} has been kicked by {ctx.author.mention}",
+            color=discord.Color.orange()
+        )
+        embed.add_field(name="Reason", value=reason)
+        await ctx.send(embed=embed)
+    except Exception as e:
+        await ctx.send(f"❌ Failed to kick member: {e}")
+
+@bot.command()
+@commands.has_permissions(manage_messages=True)
+async def timeout(ctx, member: discord.Member, duration: str, *, reason="No reason provided"):
+    """Timeout a member (format: 1h, 30m, 2d). Usage: !timeout @user 30m [reason]"""
+    try:
+        time_units = {
+            's': 1,
+            'm': 60,
+            'h': 3600,
+            'd': 86400
         }
+        duration_lower = duration.lower()
+        if duration_lower[-1] not in time_units:
+            raise ValueError("Invalid time unit. Use s, m, h, or d")
+        
+        time_value = int(duration_lower[:-1])
+        time_unit = duration_lower[-1]
+        seconds = time_value * time_units[time_unit]
+        
+        timeout_duration = datetime.timedelta(seconds=seconds)
+        await member.timeout(timeout_duration, reason=reason)
         
         embed = discord.Embed(
-            title="🎵 Now Playing",
-            description=f"[{player.title}]({url})",
-            color=discord.Color.green()
+            title="⏳ Member Timed Out",
+            description=f"{member.mention} has been timed out by {ctx.author.mention}",
+            color=discord.Color.gold()
         )
-        embed.set_thumbnail(url=player.thumbnail)
-        
-        if player.duration:
-            embed.add_field(name="Duration", value=player.duration, inline=True)
-            
-        view = ControlButtons(ctx)
-        control_message = await ctx.send(embed=embed, view=view)
-        
-        current_players[ctx.guild.id]['control_message'] = control_message
-        
-        def after_playing(error):
-            if error:
-                print(f'Player error: {error}')
-            asyncio.run_coroutine_threadsafe(play_next(ctx), bot.loop)
-            
-        voice_client.play(player, after=after_playing)
-        
+        embed.add_field(name="Duration", value=duration)
+        embed.add_field(name="Reason", value=reason)
+        await ctx.send(embed=embed)
     except Exception as e:
-        await ctx.send(f"Error playing song: {e}")
-        await play_next(ctx)
+        await ctx.send(f"❌ Failed to timeout member: {e}\nUsage: `{PREFIX}timeout @user 30m [reason]`")
 
-def search_youtube(query):
-    search_url = f"https://www.youtube.com/results?search_query={quote(query)}"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    }
+@bot.command()
+@commands.has_permissions(manage_channels=True)
+async def slowmode(ctx, duration: str):
+    """Set slowmode for the channel (format: 1h, 30m, 2d). Usage: !slowmode 30s"""
     try:
-        response = requests.get(search_url, headers=headers)
-        if response.status_code != 200:
-            print("Failed to fetch YouTube results")
-            return []
+        time_units = {
+            's': 1,
+            'm': 60,
+            'h': 3600,
+            'd': 86400
+        }
+        duration_lower = duration.lower()
+        if duration_lower[-1] not in time_units:
+            raise ValueError("Invalid time unit. Use s, m, h, or d")
         
-        html = response.text
-        initial_data = {}
-        try:
-            start = html.index('var ytInitialData = ') + len('var ytInitialData = ')
-            end = html.index('};</script>', start) + 1
-            json_str = html[start:end]
-            initial_data = json.loads(json_str)
-        except (ValueError, json.JSONDecodeError) as e:
-            print("Failed to parse YouTube data:", e)
-            return []
+        time_value = int(duration_lower[:-1])
+        time_unit = duration_lower[-1]
+        seconds = time_value * time_units[time_unit]
         
-        videos = []
-        contents = initial_data.get('contents', {}).get('twoColumnSearchResultsRenderer', {}).get('primaryContents', {}).get('sectionListRenderer', {}).get('contents', [{}])[0].get('itemSectionRenderer', {}).get('contents', [])
+        if seconds > 21600:
+            await ctx.send("Slowmode cannot be longer than 6 hours!")
+            return
         
-        for content in contents:
-            if 'videoRenderer' in content:
-                video = content['videoRenderer']
-                video_id = video.get('videoId')
-                title = video.get('title', {}).get('runs', [{}])[0].get('text')
-                duration_text = video.get('lengthText', {}).get('simpleText', '')
-                
-                if video_id and title:
-                    videos.append({
-                        'title': title,
-                        'url': f'https://www.youtube.com/watch?v={video_id}',
-                        'duration': duration_text,
-                        'thumbnail': f'https://img.youtube.com/vi/{video_id}/hqdefault.jpg'
-                    })
-                if len(videos) >= 10:
-                    break
-        return videos
+        await ctx.channel.edit(slowmode_delay=seconds)
+        await ctx.send(f"⏳ Slowmode set to {duration} in this channel.")
     except Exception as e:
-        print(f"Error searching YouTube: {e}")
-        return []
+        await ctx.send(f"❌ Failed to set slowmode: {e}\nUsage: `{PREFIX}slowmode 30s`")
 
-@bot.command(aliases=['p'])
-async def play(ctx, *, query: str):
-    """Play a song or add to queue. Usage: !play <song name/url>"""
-    voice_client = ctx.voice_client
-    
-    if not ctx.author.voice:
-        await ctx.send("You need to be in a voice channel to play music!")
-        return
-    
-    if voice_client and voice_client.is_connected():
-        if voice_client.channel != ctx.author.voice.channel:
-            await voice_client.move_to(ctx.author.voice.channel)
-    else:
-        voice_client = await ctx.author.voice.channel.connect()
-    
-    if ctx.guild.id in idle_timers:
-        idle_timers[ctx.guild.id].cancel()
-    
-    results = search_youtube(query)
-    if not results:
-        await ctx.send("No results found!")
-        return
-    
-    embed = discord.Embed(title="🔍 Search Results", description=f"Results for: {query}", color=0x00ff00)
-    for idx, video in enumerate(results[:10], 1):
-        embed.add_field(
-            name=f"{idx}. {video['title']}",
-            value=f"Duration: {video.get('duration', 'N/A')}",
-            inline=False
-        )
-    
-    view = SongSelectView(results, ctx)
-    view.message = await ctx.send(embed=embed, view=view)
-
-@bot.command()
-async def skip(ctx):
-    """Skip the current song. Usage: !skip"""
-    voice_client = ctx.voice_client
-    if voice_client and (voice_client.is_playing() or voice_client.is_paused()):
-        voice_client.stop()
-        await ctx.send("⏭️ Song skipped")
-        await play_next(ctx)
-    else:
-        await ctx.send("Nothing is playing to skip!")
-
-@bot.command()
-async def queue(ctx):
-    """Show the current queue. Usage: !queue"""
-    if ctx.guild.id in song_queues and song_queues[ctx.guild.id]:
-        queue_list = [f"{idx+1}. {song['title']}" for idx, song in enumerate(song_queues[ctx.guild.id])]
+@bot.command(aliases=['nick'])
+@commands.has_permissions(manage_nicknames=True)
+async def setnick(ctx, member: discord.Member, *, nickname: str):
+    """Set a member's nickname. Usage: !setnick @user NewNickname"""
+    try:
+        old_nick = member.display_name
+        await member.edit(nick=nickname)
         embed = discord.Embed(
-            title="🎶 Current Queue",
-            description="\n".join(queue_list),
+            title="📝 Nickname Changed",
+            description=f"{member.mention}'s nickname has been updated",
             color=discord.Color.blue()
         )
+        embed.add_field(name="Before", value=old_nick, inline=True)
+        embed.add_field(name="After", value=nickname, inline=True)
         await ctx.send(embed=embed)
-    else:
-        await ctx.send("The queue is empty.")
+    except Exception as e:
+        await ctx.send(f"❌ Failed to change nickname: {e}")
 
 @bot.command()
-async def clearqueue(ctx):
-    """Clear the current queue. Usage: !clearqueue"""
-    if ctx.guild.id in song_queues:
-        song_queues[ctx.guild.id].clear()
-        await ctx.send("Queue cleared!")
-    else:
-        await ctx.send("The queue is already empty.")
+async def getroles(ctx, member: discord.Member = None):
+    """Get a member's roles. Usage: !getroles [@user]"""
+    target = member or ctx.author
+    roles = [role.mention for role in target.roles if role.name != "@everyone"]
+    
+    if not roles:
+        await ctx.send(f"{target.display_name} has no roles.")
+        return
+    
+    embed = discord.Embed(
+        title=f"🎭 Roles for {target.display_name}",
+        description=" ".join(roles),
+        color=discord.Color.green()
+    )
+    await ctx.send(embed=embed)
 
 @bot.command()
-async def pause(ctx):
-    """Pause the current song. Usage: !pause"""
-    voice_client = ctx.voice_client
-    if voice_client and voice_client.is_playing():
-        voice_client.pause()
-        await ctx.send("⏸ Playback paused")
-    else:
-        await ctx.send("Nothing is playing!")
-
-@bot.command()
-async def resume(ctx):
-    """Resume the current song. Usage: !resume"""
-    voice_client = ctx.voice_client
-    if voice_client and voice_client.is_paused():
-        voice_client.resume()
-        await ctx.send("▶ Playback resumed")
-    else:
-        await ctx.send("Playback is not paused!")
-
-@bot.command()
-async def stop(ctx):
-    """Stop playback and clear queue. Usage: !stop"""
-    voice_client = ctx.voice_client
-    if voice_client:
-        if ctx.guild.id in song_queues:
-            song_queues[ctx.guild.id].clear()
-        if ctx.guild.id in current_players:
-            if 'control_message' in current_players[ctx.guild.id]:
-                try:
-                    await current_players[ctx.guild.id]['control_message'].delete()
-                except:
-                    pass
-            del current_players[ctx.guild.id]
-        await voice_client.disconnect()
-        await ctx.send("⏹ Playback stopped and queue cleared")
-    else:
-        await ctx.send("I'm not in a voice channel!")
-
-@bot.command()
-async def leave(ctx):
-    """Make the bot leave the voice channel. Usage: !leave"""
-    voice_client = ctx.voice_client
-    if voice_client:
-        if ctx.guild.id in PERMA_VC:
-            del PERMA_VC[ctx.guild.id]
+@commands.has_permissions(manage_roles=True)
+async def addrole(ctx, member: discord.Member, *, role: discord.Role):
+    """Add a role to a member. Usage: !addrole @user @Role"""
+    try:
+        if role in member.roles:
+            await ctx.send(f"{member.display_name} already has the {role.name} role!")
+            return
             
-        if ctx.guild.id in song_queues:
-            song_queues[ctx.guild.id].clear()
-        if ctx.guild.id in current_players:
-            if 'control_message' in current_players[ctx.guild.id]:
-                try:
-                    await current_players[ctx.guild.id]['control_message'].delete()
-                except:
-                    pass
-            del current_players[ctx.guild.id]
-        await voice_client.disconnect()
-        await ctx.send("⏹ Playback stopped and queue cleared")
-    else:
-        await ctx.send("I'm not in a voice channel!")
+        await member.add_roles(role)
+        embed = discord.Embed(
+            title="➕ Role Added",
+            description=f"{role.mention} has been added to {member.mention}",
+            color=role.color
+        )
+        await ctx.send(embed=embed)
+    except Exception as e:
+        await ctx.send(f"❌ Failed to add role: {e}")
+
+@bot.command()
+@commands.has_permissions(manage_roles=True)
+async def removerole(ctx, member: discord.Member, *, role: discord.Role):
+    """Remove a role from a member. Usage: !removerole @user @Role"""
+    try:
+        if role not in member.roles:
+            await ctx.send(f"{member.display_name} doesn't have the {role.name} role!")
+            return
+            
+        await member.remove_roles(role)
+        embed = discord.Embed(
+            title="➖ Role Removed",
+            description=f"{role.mention} has been removed from {member.mention}",
+            color=role.color
+        )
+        await ctx.send(embed=embed)
+    except Exception as e:
+        await ctx.send(f"❌ Failed to remove role: {e}")
 
 @bot.command()
 @commands.has_permissions(manage_channels=True)
@@ -1487,7 +2032,695 @@ async def unlock(ctx, channel: discord.TextChannel = None, role: discord.Role = 
     except Exception as e:
         await ctx.send(f"An error occurred: {e}")
 
-# --- Owo Game Commands --- (Clone)
+@bot.command()
+@commands.has_permissions(manage_messages=True)
+async def warn(ctx, member: discord.Member, *, reason: str = "No reason provided"):
+    """Warn a member and keep track of warnings. Usage: !warn @user [reason]"""
+    warnings_data = get_warnings_data()
+    guild_id = str(ctx.guild.id)
+    user_id = str(member.id)
+    
+    if guild_id not in warnings_data:
+        warnings_data[guild_id] = {}
+    
+    if user_id not in warnings_data[guild_id]:
+        warnings_data[guild_id][user_id] = []
+    
+    warning = {
+        "moderator": ctx.author.id,
+        "reason": reason,
+        "timestamp": datetime.datetime.now().isoformat()
+    }
+    
+    warnings_data[guild_id][user_id].append(warning)
+    save_warnings_data(warnings_data)
+    
+    embed = discord.Embed(
+        title="⚠️ Member Warned",
+        description=f"{member.mention} has been warned by {ctx.author.mention}",
+        color=discord.Color.orange()
+    )
+    embed.add_field(name="Reason", value=reason, inline=False)
+    embed.add_field(name="Total Warnings", value=len(warnings_data[guild_id][user_id]), inline=False)
+    embed.set_footer(text=f"User ID: {member.id}")
+    
+    await ctx.send(embed=embed)
+    
+    try:
+        dm_embed = discord.Embed(
+            title=f"⚠️ You've been warned in {ctx.guild.name}",
+            color=discord.Color.orange()
+        )
+        dm_embed.add_field(name="Reason", value=reason, inline=False)
+        dm_embed.add_field(name="Moderator", value=ctx.author.mention, inline=False)
+        dm_embed.add_field(name="Total Warnings", value=len(warnings_data[guild_id][user_id]), inline=False)
+        await member.send(embed=dm_embed)
+    except discord.Forbidden:
+        pass
+
+@bot.command()
+async def warnings(ctx, member: discord.Member = None):
+    """Check a member's warnings. Usage: !warnings [@user]"""
+    target = member or ctx.author
+    warnings_data = get_warnings_data()
+    guild_id = str(ctx.guild.id)
+    user_id = str(target.id)
+    
+    if guild_id not in warnings_data or user_id not in warnings_data[guild_id] or not warnings_data[guild_id][user_id]:
+        return await ctx.send(f"{target.display_name} has no warnings.")
+    
+    warnings_list = warnings_data[guild_id][user_id]
+    
+    embed = discord.Embed(
+        title=f"⚠️ Warnings for {target.display_name}",
+        description=f"Total warnings: {len(warnings_list)}",
+        color=discord.Color.orange()
+    )
+    
+    for i, warning in enumerate(warnings_list, 1):
+        moderator = ctx.guild.get_member(warning["moderator"]) or f"User ID: {warning['moderator']}"
+        timestamp = datetime.datetime.fromisoformat(warning["timestamp"]).strftime("%Y-%m-%d %H:%M")
+        embed.add_field(
+            name=f"Warning #{i}",
+            value=f"**Reason:** {warning['reason']}\n**By:** {moderator}\n**On:** {timestamp}",
+            inline=False
+        )
+    
+    await ctx.send(embed=embed)
+
+@bot.command()
+@commands.has_permissions(manage_messages=True)
+async def clearwarns(ctx, member: discord.Member):
+    """Clear all warnings for a member. Usage: !clearwarns @user"""
+    warnings_data = get_warnings_data()
+    guild_id = str(ctx.guild.id)
+    user_id = str(member.id)
+    
+    if guild_id not in warnings_data or user_id not in warnings_data[guild_id]:
+        return await ctx.send(f"{member.display_name} has no warnings to clear.")
+    
+    warnings_data[guild_id].pop(user_id)
+    save_warnings_data(warnings_data)
+    
+    embed = discord.Embed(
+        title="✅ Warnings Cleared",
+        description=f"All warnings for {member.mention} have been cleared.",
+        color=discord.Color.green()
+    )
+    await ctx.send(embed=embed)
+
+@bot.command(aliases=['clear'])
+@commands.has_permissions(manage_messages=True)
+async def purge(ctx, amount: int = 10):
+    """Purge messages from the channel (default: 10). Usage: !purge [amount]"""
+    if amount <= 0 or amount > 100:
+        return await ctx.send("Please provide a number between 1 and 100.")
+    
+    deleted = await ctx.channel.purge(limit=amount + 1)
+    
+    embed = discord.Embed(
+        title="🗑️ Messages Purged",
+        description=f"Deleted {len(deleted) - 1} messages.",
+        color=discord.Color.green()
+    )
+    msg = await ctx.send(embed=embed, delete_after=5)
+
+@bot.command()
+@commands.has_permissions(manage_nicknames=True)
+async def resetnick(ctx, member: discord.Member):
+    """Reset a member's nickname. Usage: !resetnick @user"""
+    try:
+        old_nick = member.display_name
+        await member.edit(nick=None)
+        embed = discord.Embed(
+            title="✅ Nickname Reset",
+            description=f"{member.mention}'s nickname has been reset.",
+            color=discord.Color.green()
+        )
+        embed.add_field(name="Previous Nickname", value=old_nick, inline=True)
+        await ctx.send(embed=embed)
+    except Exception as e:
+        await ctx.send(f"❌ Failed to reset nickname: {e}")
+
+@bot.command()
+@commands.has_permissions(manage_messages=True)
+async def mute(ctx, member: discord.Member, *, reason: str = "No reason provided"):
+    """Mute a member in text channels. Usage: !mute @user [reason]"""
+    try:
+        muted_role = discord.utils.get(ctx.guild.roles, name="Muted")
+        
+        if not muted_role:
+            muted_role = await ctx.guild.create_role(name="Muted")
+            
+            for channel in ctx.guild.channels:
+                await channel.set_permissions(muted_role,
+                    send_messages=False,
+                    speak=False,
+                    add_reactions=False
+                )
+        
+        await member.add_roles(muted_role, reason=reason)
+        
+        embed = discord.Embed(
+            title="🔇 Member Muted",
+            description=f"{member.mention} has been muted by {ctx.author.mention}",
+            color=discord.Color.red()
+        )
+        embed.add_field(name="Reason", value=reason, inline=False)
+        await ctx.send(embed=embed)
+        
+        try:
+            dm_embed = discord.Embed(
+                title=f"🔇 You've been muted in {ctx.guild.name}",
+                color=discord.Color.red()
+            )
+            dm_embed.add_field(name="Reason", value=reason, inline=False)
+            dm_embed.add_field(name="Moderator", value=ctx.author.mention, inline=False)
+            await member.send(embed=dm_embed)
+        except discord.Forbidden:
+            pass
+            
+    except Exception as e:
+        await ctx.send(f"❌ Failed to mute member: {e}")
+
+@bot.command()
+@commands.has_permissions(manage_messages=True)
+async def unmute(ctx, member: discord.Member):
+    """Unmute a member. Usage: !unmute @user"""
+    try:
+        muted_role = discord.utils.get(ctx.guild.roles, name="Muted")
+        
+        if not muted_role or muted_role not in member.roles:
+            return await ctx.send(f"{member.display_name} is not muted.")
+        
+        await member.remove_roles(muted_role)
+        
+        embed = discord.Embed(
+            title="🔊 Member Unmuted",
+            description=f"{member.mention} has been unmuted by {ctx.author.mention}",
+            color=discord.Color.green()
+        )
+        await ctx.send(embed=embed)
+        
+        try:
+            dm_embed = discord.Embed(
+                title=f"🔊 You've been unmuted in {ctx.guild.name}",
+                color=discord.Color.green()
+            )
+            await member.send(embed=dm_embed)
+        except discord.Forbidden:
+            pass
+            
+    except Exception as e:
+        await ctx.send(f"❌ Failed to unmute member: {e}")
+
+@bot.command()
+@commands.has_permissions(manage_channels=True)
+async def nuke(ctx, channel: discord.TextChannel = None):
+    """Clone and delete a channel to remove all messages. Usage: !nuke [channel]"""
+    target_channel = channel or ctx.channel
+    
+    confirmation = await ctx.send(f"⚠️ Are you sure you want to nuke {target_channel.mention}? This will delete ALL messages! React with ✅ to confirm.")
+    await confirmation.add_reaction("✅")
+    
+    def check(reaction, user):
+        return user == ctx.author and str(reaction.emoji) == "✅" and reaction.message.id == confirmation.id
+    
+    try:
+        await bot.wait_for('reaction_add', timeout=30.0, check=check)
+    except asyncio.TimeoutError:
+        await confirmation.edit(content="🚫 Channel nuke cancelled.")
+        return
+    
+    try:
+        new_channel = await target_channel.clone(reason=f"Channel nuked by {ctx.author}")
+        await target_channel.delete(reason=f"Channel nuked by {ctx.author}")
+        
+        embed = discord.Embed(
+            title="💥 Channel Nuked",
+            description=f"This channel has been nuked by {ctx.author.mention}",
+            color=discord.Color.red()
+        )
+        embed.set_image(url="https://media.giphy.com/media/oe33xf3B50fsc/giphy.gif")
+        await new_channel.send(embed=embed)
+    except Exception as e:
+        await ctx.send(f"❌ Failed to nuke channel: {e}")
+
+@bot.command()
+@commands.has_permissions(manage_channels=True)
+async def clone(ctx, channel: discord.TextChannel = None):
+    """Clone a text channel. Usage: !clone [channel]"""
+    target_channel = channel or ctx.channel
+    
+    try:
+        new_channel = await target_channel.clone()
+        await ctx.send(f"✅ Successfully cloned {target_channel.mention} to {new_channel.mention}")
+    except Exception as e:
+        await ctx.send(f"❌ Failed to clone channel: {e}")
+
+@bot.command()
+@commands.has_permissions(manage_channels=True)
+async def slowoff(ctx, channel: discord.TextChannel = None):
+    """Remove slowmode from a channel. Usage: !slowoff [channel]"""
+    target_channel = channel or ctx.channel
+    
+    try:
+        await target_channel.edit(slowmode_delay=0)
+        await ctx.send(f"✅ Slowmode removed from {target_channel.mention}")
+    except Exception as e:
+        await ctx.send(f"❌ Failed to remove slowmode: {e}")
+
+@bot.command()
+@commands.has_permissions(manage_roles=True)
+async def createrole(ctx, name: str, color: str = None, *, reason: str = None):
+    """Create a new role. Usage: !createrole <name> [hex color] [reason]"""
+    try:
+        role_color = discord.Color.default()
+        if color:
+            if color.startswith('#'):
+                color = color[1:]
+            try:
+                role_color = discord.Color(int(color, 16))
+            except ValueError:
+                await ctx.send("❌ Invalid color format. Use hex (e.g., #FF0000 or FF0000)")
+                return
+        
+        new_role = await ctx.guild.create_role(
+            name=name,
+            color=role_color,
+            reason=reason
+        )
+        
+        embed = discord.Embed(
+            title="✅ Role Created",
+            description=f"New role {new_role.mention} has been created",
+            color=role_color
+        )
+        if reason:
+            embed.add_field(name="Reason", value=reason, inline=False)
+        await ctx.send(embed=embed)
+    except Exception as e:
+        await ctx.send(f"❌ Failed to create role: {e}")
+
+@bot.command()
+@commands.has_permissions(manage_roles=True)
+async def deleterole(ctx, *, role: discord.Role):
+    """Delete a role. Usage: !deleterole @role"""
+    try:
+        await role.delete()
+        await ctx.send(f"✅ Role `{role.name}` has been deleted")
+    except Exception as e:
+        await ctx.send(f"❌ Failed to delete role: {e}")
+
+# --- Utility Commands ---
+
+@bot.command()
+async def translate(ctx, target_lang: str, *, text: str):
+    """Translate text to another language. Usage: !translate <target_lang> <text>"""
+    try:
+        url = "https://translate.googleapis.com/translate_a/single"
+        params = {
+            'client': 'gtx',
+            'sl': 'auto',
+            'tl': target_lang,
+            'dt': 't',
+            'q': text
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    translated_text = data[0][0][0]
+                    source_lang = data[2]
+                    
+                    embed = discord.Embed(
+                        title="🌍 Translation",
+                        color=discord.Color.blue()
+                    )
+                    embed.add_field(name=f"Original ({source_lang})", value=text, inline=False)
+                    embed.add_field(name=f"Translated ({target_lang})", value=translated_text, inline=False)
+                    await ctx.send(embed=embed)
+                else:
+                    await ctx.send("❌ Failed to translate text. Please try again later.")
+    except Exception as e:
+        await ctx.send(f"❌ Translation error: {e}")
+
+@bot.command()
+async def weather(ctx, *, location: str):
+    """Get weather for a location. Usage: !weather <city>"""
+    try:
+        if WEATHER_API_KEY == 'your_api_key_here':
+            return await ctx.send("Weather API is not configured.")
+            
+        base_url = "http://api.openweathermap.org/data/2.5/weather"
+        params = {
+            'q': location,
+            'appid': WEATHER_API_KEY,
+            'units': 'metric'
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(base_url, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    
+                    city = data['name']
+                    country = data['sys']['country']
+                    temp = data['main']['temp']
+                    feels_like = data['main']['feels_like']
+                    humidity = data['main']['humidity']
+                    wind = data['wind']['speed']
+                    description = data['weather'][0]['description'].title()
+                    icon = data['weather'][0]['icon']
+                    
+                    embed = discord.Embed(
+                        title=f"⛅ Weather in {city}, {country}",
+                        description=f"**{description}**",
+                        color=discord.Color.blue()
+                    )
+                    embed.set_thumbnail(url=f"http://openweathermap.org/img/wn/{icon}@2x.png")
+                    embed.add_field(name="🌡️ Temperature", value=f"{temp}°C (Feels like {feels_like}°C)", inline=True)
+                    embed.add_field(name="💧 Humidity", value=f"{humidity}%", inline=True)
+                    embed.add_field(name="🌬️ Wind Speed", value=f"{wind} m/s", inline=True)
+                    
+                    await ctx.send(embed=embed)
+                else:
+                    await ctx.send("❌ Could not find weather for that location. Please check the spelling.")
+    except Exception as e:
+        await ctx.send(f"❌ Weather lookup error: {e}")
+
+@bot.command(aliases=['calc'])
+async def calculator(ctx, *, expression: str):
+    """Evaluate a math expression. Usage: !calc <expression>"""
+    try:
+        expr = expression.replace(' ', '')
+        if not re.match(r'^[\d+\-*/().^% ]+$', expr):
+            return await ctx.send("❌ Invalid characters in expression. Only numbers and +-*/^% operators allowed.")
+        
+        expr = expr.replace('^', '**')
+        result = eval(expr, {'__builtins__': None}, {})
+        
+        embed = discord.Embed(
+            title="🧮 Calculator",
+            color=discord.Color.blue()
+        )
+        embed.add_field(name="Expression", value=expression, inline=False)
+        embed.add_field(name="Result", value=str(result), inline=False)
+        await ctx.send(embed=embed)
+    except ZeroDivisionError:
+        await ctx.send("❌ Cannot divide by zero!")
+    except Exception as e:
+        await ctx.send(f"❌ Calculation error: {e}")
+
+@bot.command()
+async def poll(ctx, question: str, *options: str):
+    """Create a poll. Usage: !poll "Question" "Option1" "Option2" ..."""
+    if len(options) < 2:
+        return await ctx.send("Please provide at least 2 options for the poll.")
+    if len(options) > 10:
+        return await ctx.send("You can only have up to 10 options.")
+    
+    emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟']
+    
+    description = []
+    for i, option in enumerate(options):
+        description.append(f"{emojis[i]} {option}")
+    
+    embed = discord.Embed(
+        title=f"📊 Poll: {question}",
+        description="\n".join(description),
+        color=discord.Color.blue()
+    )
+    embed.set_footer(text=f"Poll created by {ctx.author.display_name}")
+    
+    message = await ctx.send(embed=embed)
+    
+    for i in range(len(options)):
+        await message.add_reaction(emojis[i])
+
+@bot.command()
+@commands.has_permissions(manage_channels=True)
+async def vc247(ctx):
+    """Make the bot stay in voice channel 24/7. Usage: !24-7vc"""
+    if not ctx.author.voice:
+        return await ctx.send("You need to be in a voice channel to use this command!")
+    
+    voice_client = ctx.voice_client
+    
+    if voice_client and voice_client.is_connected():
+        if voice_client.channel != ctx.author.voice.channel:
+            await voice_client.move_to(ctx.author.voice.channel)
+    else:
+        voice_client = await ctx.author.voice.channel.connect()
+    
+    PERMA_VC[ctx.guild.id] = True
+    
+    async def maintain_connection():
+        while PERMA_VC.get(ctx.guild.id, False):
+            if not voice_client.is_connected():
+                try:
+                    await ctx.author.voice.channel.connect()
+                except:
+                    pass
+            
+            await asyncio.sleep(10)  # Check every 10 seconds
+    
+    bot.loop.create_task(maintain_connection())
+    
+    await ctx.send("🔊 Bot will now stay in this voice channel 24/7. Use `!leave` to stop.")
+
+@bot.command()
+async def avatar(ctx, member: discord.Member = None):
+    """Get a user's avatar. Usage: !avatar [@user]"""
+    target = member or ctx.author
+    embed = discord.Embed(
+        title=f"{target.display_name}'s Avatar",
+        color=discord.Color.blue()
+    )
+    embed.set_image(url=target.avatar.url)
+    await ctx.send(embed=embed)
+
+@bot.command()
+async def serverinfo(ctx):
+    """Get server information. Usage: !serverinfo"""
+    guild = ctx.guild
+    embed = discord.Embed(
+        title=f"Server Info: {guild.name}",
+        color=discord.Color.blue()
+    )
+    embed.set_thumbnail(url=guild.icon.url)
+    
+    embed.add_field(name="Owner", value=guild.owner.mention, inline=True)
+    embed.add_field(name="Created", value=guild.created_at.strftime("%B %d, %Y"), inline=True)
+    embed.add_field(name="Members", value=guild.member_count, inline=True)
+    embed.add_field(name="Roles", value=len(guild.roles), inline=True)
+    embed.add_field(name="Channels", value=f"Text: {len(guild.text_channels)}\nVoice: {len(guild.voice_channels)}", inline=True)
+    embed.add_field(name="Boosts", value=guild.premium_subscription_count, inline=True)
+    
+    await ctx.send(embed=embed)
+
+@bot.command()
+async def userinfo(ctx, member: discord.Member = None):
+    """Get user information. Usage: !userinfo [@user]"""
+    target = member or ctx.author
+    embed = discord.Embed(
+        title=f"User Info: {target.display_name}",
+        color=discord.Color.blue()
+    )
+    embed.set_thumbnail(url=target.avatar.url)
+    
+    embed.add_field(name="ID", value=target.id, inline=True)
+    embed.add_field(name="Nickname", value=target.nick or "None", inline=True)
+    embed.add_field(name="Created", value=target.created_at.strftime("%B %d, %Y"), inline=True)
+    embed.add_field(name="Joined", value=target.joined_at.strftime("%B %d, %Y"), inline=True)
+    
+    roles = [role.mention for role in target.roles if role.name != "@everyone"]
+    embed.add_field(
+        name=f"Roles ({len(roles)})", 
+        value=" ".join(roles) if roles else "None", 
+        inline=False
+    )
+    
+    await ctx.send(embed=embed)
+
+@bot.command()
+async def remind(ctx, time: str, *, reminder: str):
+    """Set a reminder. Usage: !remind 1h30m Do homework"""
+    try:
+        seconds = 0
+        time_lower = time.lower()
+        
+        if 'd' in time_lower:
+            days = int(time_lower.split('d')[0])
+            seconds += days * 86400
+            time_lower = time_lower.split('d')[1]
+        if 'h' in time_lower:
+            hours = int(time_lower.split('h')[0])
+            seconds += hours * 3600
+            time_lower = time_lower.split('h')[1]
+        if 'm' in time_lower:
+            minutes = int(time_lower.split('m')[0])
+            seconds += minutes * 60
+            time_lower = time_lower.split('m')[1]
+        if 's' in time_lower:
+            secs = int(time_lower.split('s')[0])
+            seconds += secs
+        
+        if seconds <= 0:
+            return await ctx.send("Please provide a valid time greater than 0 seconds.")
+        
+        await ctx.send(f"⏰ I'll remind you in {time} about: {reminder}")
+        
+        await asyncio.sleep(seconds)
+        
+        embed = discord.Embed(
+            title="⏰ Reminder",
+            description=reminder,
+            color=discord.Color.gold()
+        )
+        embed.set_footer(text=f"You set this reminder {time} ago")
+        
+        await ctx.author.send(embed=embed)
+    except Exception as e:
+        await ctx.send(f"❌ Failed to set reminder: {e}\nUsage: `{PREFIX}remind 1h30m Do homework`")
+
+# --- Fun & Game Commands ---
+
+@bot.command(aliases=['rockpaperscissors'])
+async def rps(ctx, choice: str):
+    """Play Rock Paper Scissors. Usage: !rps rock|paper|scissors"""
+    choices = ["rock", "paper", "scissors"]
+    emojis = {"rock": "🪨", "paper": "📄", "scissors": "✂️"}
+    bot_choice = random.choice(choices)
+    user_choice = choice.lower()
+    
+    if user_choice not in choices:
+        await ctx.send("Please choose rock, paper, or scissors!")
+        return
+    
+    if user_choice == bot_choice:
+        result = "It's a tie! 🤝"
+    elif (user_choice == "rock" and bot_choice == "scissors") or \
+         (user_choice == "paper" and bot_choice == "rock") or \
+         (user_choice == "scissors" and bot_choice == "paper"):
+        result = "You win! 🎉"
+    else:
+        result = "I win! 😎"
+    
+    embed = discord.Embed(
+        title="🪨 📄 ✂️ Rock Paper Scissors",
+        color=discord.Color.blurple()
+    )
+    embed.add_field(name="Your Choice", value=f"{emojis[user_choice]} {user_choice.capitalize()}", inline=True)
+    embed.add_field(name="My Choice", value=f"{emojis[bot_choice]} {bot_choice.capitalize()}", inline=True)
+    embed.add_field(name="Result", value=result, inline=False)
+    await ctx.send(embed=embed)
+
+@bot.command(aliases=['dice'])
+async def roll(ctx, dice: str = "1d6"):
+    """Roll dice in NdN format (e.g., 2d20). Usage: !roll 2d20"""
+    try:
+        rolls, limit = map(int, dice.split('d'))
+        if rolls > 20 or limit > 100:
+            await ctx.send("Maximum 20 dice with 100 sides each!")
+            return
+            
+        results = [random.randint(1, limit) for _ in range(rolls)]
+        total = sum(results)
+        
+        embed = discord.Embed(
+            title="🎲 Dice Roll",
+            description=f"Rolling {dice}",
+            color=discord.Color.random()
+        )
+        embed.add_field(name="Results", value=", ".join(map(str, results)), inline=True)
+        embed.add_field(name="Total", value=total, inline=True)
+        
+        if rolls == 1 and limit == 20:
+            if results[0] == 20:
+                embed.set_footer(text="Nat 20! Critical success! 🎯")
+            elif results[0] == 1:
+                embed.set_footer(text="Critical fail! 💀")
+        
+        await ctx.send(embed=embed)
+    except Exception:
+        await ctx.send(f'Format must be NdN! Example: `{PREFIX}roll 2d20`')
+
+@bot.command(aliases=['flip'])
+async def flipcoin(ctx):
+    """Flip a coin (no betting). Usage: !flipcoin"""
+    result = random.choice(["Heads", "Tails"])
+    embed = discord.Embed(
+        title="🪙 Coin Flip",
+        description=f"The coin landed on... **{result}**!",
+        color=discord.Color.gold()
+    )
+    await ctx.send(embed=embed)
+
+@bot.command()
+async def guess(ctx, number: int):
+    """Guess a number between 1 and 10. Usage: !guess 5"""
+    if number < 1 or number > 10:
+        await ctx.send("Please guess a number between 1 and 10!")
+        return
+        
+    secret = random.randint(1, 10)
+    if number == secret:
+        message = f"🎉 Congratulations! You guessed it! The number was {secret}."
+        color = discord.Color.green()
+    else:
+        message = f"❌ Sorry, the number was {secret}. Try again!"
+        color = discord.Color.red()
+    
+    embed = discord.Embed(
+        title="🔢 Number Guessing Game",
+        description=message,
+        color=color
+    )
+    await ctx.send(embed=embed)
+
+@bot.command()
+async def slap(ctx, member: discord.Member):
+    """Slap someone! Usage: !slap @user"""
+    gif_url = "https://c.tenor.com/XiYuU9h44-AAAAAC/tenor.gif"
+    reactions = ["(╯°□°）╯︵ ┻━┻", "⊙﹏⊙", "(ﾉ｀Д´)ﾉ", "ಠ_ಠ", "(•̀o•́)ง"]
+    
+    embed = discord.Embed(
+        color=discord.Color.red()
+    )
+    embed.set_author(name=f"{ctx.author.display_name} slapped {member.display_name} {random.choice(reactions)}")
+    embed.set_image(url=gif_url)
+    await ctx.send(embed=embed)
+
+@bot.command()
+async def kiss(ctx, member: discord.Member):
+    """Kiss someone! Usage: !kiss @user"""
+    gif_url = "https://www.icegif.com/wp-content/uploads/2022/08/icegif-1235.gif"
+    reactions = ["(づ￣ ³￣)づ", "(*˘︶˘*).｡.:*♡", "(っ˘ω˘ς )", "♡(˃͈ દ ˂͈ ༶ )", "(´∀｀)♡"]
+    
+    embed = discord.Embed(
+        color=discord.Color.pink()
+    )
+    embed.set_author(name=f"{ctx.author.display_name} kissed {member.display_name} {random.choice(reactions)}")
+    embed.set_image(url=gif_url)
+    await ctx.send(embed=embed)
+
+@bot.command()
+async def hug(ctx, member: discord.Member):
+    """Hug someone! Usage: !hug @user"""
+    gif_url = "https://usagif.com/wp-content/uploads/gif/anime-hug-59.gif"
+    reactions = ["(⊃｡•́‿•̀｡)⊃", "(っ´▽｀)っ", "⊂((・▽・))⊃", "(つ≧▽≦)つ", "╰(*´︶`*)╯"]
+    
+    embed = discord.Embed(
+        color=discord.Color.gold()
+    )
+    embed.set_author(name=f"{ctx.author.display_name} hugged {member.display_name} {random.choice(reactions)}")
+    embed.set_image(url=gif_url)
+    await ctx.send(embed=embed)
+
+# --- Owo Economy Games ---
+
 @bot.command(name=f'{GAME_PREFIX}coinflip', aliases=[f'{GAME_PREFIX}cf'])
 async def owo_coinflip(ctx, amount: int, choice: str = None):
     """
@@ -1775,854 +3008,7 @@ async def owo_setgameprefix(ctx, new_prefix: str):
     
     await ctx.send(f"✅ Game command prefix changed from `{old_prefix}` to `{GAME_PREFIX}`")
 
-@bot.command()
-@commands.has_permissions(ban_members=True)
-async def ban(ctx, member: discord.Member, *, reason="No reason provided"):
-    """Ban a member from the server. Usage: !ban @user [reason]"""
-    try:
-        await member.ban(reason=reason)
-        embed = discord.Embed(
-            title="🔨 Member Banned",
-            description=f"{member.mention} has been banned by {ctx.author.mention}",
-            color=discord.Color.red()
-        )
-        embed.add_field(name="Reason", value=reason)
-        await ctx.send(embed=embed)
-    except Exception as e:
-        await ctx.send(f"❌ Failed to ban member: {e}")
-
-@bot.command()
-@commands.has_permissions(kick_members=True)
-async def kick(ctx, member: discord.Member, *, reason="No reason provided"):
-    """Kick a member from the server. Usage: !kick @user [reason]"""
-    try:
-        await member.kick(reason=reason)
-        embed = discord.Embed(
-            title="👢 Member Kicked",
-            description=f"{member.mention} has been kicked by {ctx.author.mention}",
-            color=discord.Color.orange()
-        )
-        embed.add_field(name="Reason", value=reason)
-        await ctx.send(embed=embed)
-    except Exception as e:
-        await ctx.send(f"❌ Failed to kick member: {e}")
-
-@bot.command()
-@commands.has_permissions(manage_messages=True)
-async def timeout(ctx, member: discord.Member, duration: str, *, reason="No reason provided"):
-    """Timeout a member (format: 1h, 30m, 2d). Usage: !timeout @user 30m [reason]"""
-    try:
-        time_units = {
-            's': 1,
-            'm': 60,
-            'h': 3600,
-            'd': 86400
-        }
-        duration_lower = duration.lower()
-        if duration_lower[-1] not in time_units:
-            raise ValueError("Invalid time unit. Use s, m, h, or d")
-        
-        time_value = int(duration_lower[:-1])
-        time_unit = duration_lower[-1]
-        seconds = time_value * time_units[time_unit]
-        
-        timeout_duration = datetime.timedelta(seconds=seconds)
-        await member.timeout(timeout_duration, reason=reason)
-        
-        embed = discord.Embed(
-            title="⏳ Member Timed Out",
-            description=f"{member.mention} has been timed out by {ctx.author.mention}",
-            color=discord.Color.gold()
-        )
-        embed.add_field(name="Duration", value=duration)
-        embed.add_field(name="Reason", value=reason)
-        await ctx.send(embed=embed)
-    except Exception as e:
-        await ctx.send(f"❌ Failed to timeout member: {e}\nUsage: `{PREFIX}timeout @user 30m [reason]`")
-
-@bot.command()
-@commands.has_permissions(manage_channels=True)
-async def slowmode(ctx, duration: str):
-    """Set slowmode for the channel (format: 1h, 30m, 2d). Usage: !slowmode 30s"""
-    try:
-        time_units = {
-            's': 1,
-            'm': 60,
-            'h': 3600,
-            'd': 86400
-        }
-        duration_lower = duration.lower()
-        if duration_lower[-1] not in time_units:
-            raise ValueError("Invalid time unit. Use s, m, h, or d")
-        
-        time_value = int(duration_lower[:-1])
-        time_unit = duration_lower[-1]
-        seconds = time_value * time_units[time_unit]
-        
-        if seconds > 21600:
-            await ctx.send("Slowmode cannot be longer than 6 hours!")
-            return
-        
-        await ctx.channel.edit(slowmode_delay=seconds)
-        await ctx.send(f"⏳ Slowmode set to {duration} in this channel.")
-    except Exception as e:
-        await ctx.send(f"❌ Failed to set slowmode: {e}\nUsage: `{PREFIX}slowmode 30s`")
-
-@bot.command(aliases=['nick'])
-@commands.has_permissions(manage_nicknames=True)
-async def setnick(ctx, member: discord.Member, *, nickname: str):
-    """Set a member's nickname. Usage: !setnick @user NewNickname"""
-    try:
-        old_nick = member.display_name
-        await member.edit(nick=nickname)
-        embed = discord.Embed(
-            title="📝 Nickname Changed",
-            description=f"{member.mention}'s nickname has been updated",
-            color=discord.Color.blue()
-        )
-        embed.add_field(name="Before", value=old_nick, inline=True)
-        embed.add_field(name="After", value=nickname, inline=True)
-        await ctx.send(embed=embed)
-    except Exception as e:
-        await ctx.send(f"❌ Failed to change nickname: {e}")
-
-@bot.command()
-async def getroles(ctx, member: discord.Member = None):
-    """Get a member's roles. Usage: !getroles [@user]"""
-    target = member or ctx.author
-    roles = [role.mention for role in target.roles if role.name != "@everyone"]
-    
-    if not roles:
-        await ctx.send(f"{target.display_name} has no roles.")
-        return
-    
-    embed = discord.Embed(
-        title=f"🎭 Roles for {target.display_name}",
-        description=" ".join(roles),
-        color=discord.Color.green()
-    )
-    await ctx.send(embed=embed)
-
-@bot.command()
-@commands.has_permissions(manage_roles=True)
-async def addrole(ctx, member: discord.Member, *, role: discord.Role):
-    """Add a role to a member. Usage: !addrole @user @Role"""
-    try:
-        if role in member.roles:
-            await ctx.send(f"{member.display_name} already has the {role.name} role!")
-            return
-            
-        await member.add_roles(role)
-        embed = discord.Embed(
-            title="➕ Role Added",
-            description=f"{role.mention} has been added to {member.mention}",
-            color=role.color
-        )
-        await ctx.send(embed=embed)
-    except Exception as e:
-        await ctx.send(f"❌ Failed to add role: {e}")
-
-@bot.command()
-@commands.has_permissions(manage_roles=True)
-async def removerole(ctx, member: discord.Member, *, role: discord.Role):
-    """Remove a role from a member. Usage: !removerole @user @Role"""
-    try:
-        if role not in member.roles:
-            await ctx.send(f"{member.display_name} doesn't have the {role.name} role!")
-            return
-            
-        await member.remove_roles(role)
-        embed = discord.Embed(
-            title="➖ Role Removed",
-            description=f"{role.mention} has been removed from {member.mention}",
-            color=role.color
-        )
-        await ctx.send(embed=embed)
-    except Exception as e:
-        await ctx.send(f"❌ Failed to remove role: {e}")
-
-@bot.command(aliases=['rockpaperscissors'])
-async def rps(ctx, choice: str):
-    """Play Rock Paper Scissors. Usage: !rps rock|paper|scissors"""
-    choices = ["rock", "paper", "scissors"]
-    emojis = {"rock": "🪨", "paper": "📄", "scissors": "✂️"}
-    bot_choice = random.choice(choices)
-    user_choice = choice.lower()
-    
-    if user_choice not in choices:
-        await ctx.send("Please choose rock, paper, or scissors!")
-        return
-    
-    if user_choice == bot_choice:
-        result = "It's a tie! 🤝"
-    elif (user_choice == "rock" and bot_choice == "scissors") or \
-         (user_choice == "paper" and bot_choice == "rock") or \
-         (user_choice == "scissors" and bot_choice == "paper"):
-        result = "You win! 🎉"
-    else:
-        result = "I win! 😎"
-    
-    embed = discord.Embed(
-        title="🪨 📄 ✂️ Rock Paper Scissors",
-        color=discord.Color.blurple()
-    )
-    embed.add_field(name="Your Choice", value=f"{emojis[user_choice]} {user_choice.capitalize()}", inline=True)
-    embed.add_field(name="My Choice", value=f"{emojis[bot_choice]} {bot_choice.capitalize()}", inline=True)
-    embed.add_field(name="Result", value=result, inline=False)
-    await ctx.send(embed=embed)
-
-@bot.command(aliases=['dice'])
-async def roll(ctx, dice: str = "1d6"):
-    """Roll dice in NdN format (e.g., 2d20). Usage: !roll 2d20"""
-    try:
-        rolls, limit = map(int, dice.split('d'))
-        if rolls > 20 or limit > 100:
-            await ctx.send("Maximum 20 dice with 100 sides each!")
-            return
-            
-        results = [random.randint(1, limit) for _ in range(rolls)]
-        total = sum(results)
-        
-        embed = discord.Embed(
-            title="🎲 Dice Roll",
-            description=f"Rolling {dice}",
-            color=discord.Color.random()
-        )
-        embed.add_field(name="Results", value=", ".join(map(str, results)), inline=True)
-        embed.add_field(name="Total", value=total, inline=True)
-        
-        if rolls == 1 and limit == 20:
-            if results[0] == 20:
-                embed.set_footer(text="Nat 20! Critical success! 🎯")
-            elif results[0] == 1:
-                embed.set_footer(text="Critical fail! 💀")
-        
-        await ctx.send(embed=embed)
-    except Exception:
-        await ctx.send(f'Format must be NdN! Example: `{PREFIX}roll 2d20`')
-
-@bot.command(aliases=['flip'])
-async def flipcoin(ctx):
-    """Flip a coin (no betting). Usage: !flipcoin"""
-    result = random.choice(["Heads", "Tails"])
-    embed = discord.Embed(
-        title="🪙 Coin Flip",
-        description=f"The coin landed on... **{result}**!",
-        color=discord.Color.gold()
-    )
-    await ctx.send(embed=embed)
-
-@bot.command()
-async def guess(ctx, number: int):
-    """Guess a number between 1 and 10. Usage: !guess 5"""
-    if number < 1 or number > 10:
-        await ctx.send("Please guess a number between 1 and 10!")
-        return
-        
-    secret = random.randint(1, 10)
-    if number == secret:
-        message = f"🎉 Congratulations! You guessed it! The number was {secret}."
-        color = discord.Color.green()
-    else:
-        message = f"❌ Sorry, the number was {secret}. Try again!"
-        color = discord.Color.red()
-    
-    embed = discord.Embed(
-        title="🔢 Number Guessing Game",
-        description=message,
-        color=color
-    )
-    await ctx.send(embed=embed)
-
-@bot.command()
-async def slap(ctx, member: discord.Member):
-    """Slap someone! Usage: !slap @user"""
-    gif_url = "https://c.tenor.com/XiYuU9h44-AAAAAC/tenor.gif"
-    reactions = ["(╯°□°）╯︵ ┻━┻", "⊙﹏⊙", "(ﾉ｀Д´)ﾉ", "ಠ_ಠ", "(•̀o•́)ง"]
-    
-    embed = discord.Embed(
-        color=discord.Color.red()
-    )
-    embed.set_author(name=f"{ctx.author.display_name} slapped {member.display_name} {random.choice(reactions)}")
-    embed.set_image(url=gif_url)
-    await ctx.send(embed=embed)
-
-@bot.command()
-async def kiss(ctx, member: discord.Member):
-    """Kiss someone! Usage: !kiss @user"""
-    gif_url = "https://www.icegif.com/wp-content/uploads/2022/08/icegif-1235.gif"
-    reactions = ["(づ￣ ³￣)づ", "(*˘︶˘*).｡.:*♡", "(っ˘ω˘ς )", "♡(˃͈ દ ˂͈ ༶ )", "(´∀｀)♡"]
-    
-    embed = discord.Embed(
-        color=discord.Color.pink()
-    )
-    embed.set_author(name=f"{ctx.author.display_name} kissed {member.display_name} {random.choice(reactions)}")
-    embed.set_image(url=gif_url)
-    await ctx.send(embed=embed)
-
-@bot.command()
-async def hug(ctx, member: discord.Member):
-    """Hug someone! Usage: !hug @user"""
-    gif_url = "https://usagif.com/wp-content/uploads/gif/anime-hug-59.gif"
-    reactions = ["(⊃｡•́‿•̀｡)⊃", "(っ´▽｀)っ", "⊂((・▽・))⊃", "(つ≧▽≦)つ", "╰(*´︶`*)╯"]
-    
-    embed = discord.Embed(
-        color=discord.Color.gold()
-    )
-    embed.set_author(name=f"{ctx.author.display_name} hugged {member.display_name} {random.choice(reactions)}")
-    embed.set_image(url=gif_url)
-    await ctx.send(embed=embed)
-
-@bot.command()
-@commands.has_permissions(manage_messages=True)
-async def warn(ctx, member: discord.Member, *, reason: str = "No reason provided"):
-    """Warn a member and keep track of warnings. Usage: !warn @user [reason]"""
-    warnings_data = get_warnings_data()
-    guild_id = str(ctx.guild.id)
-    user_id = str(member.id)
-    
-    if guild_id not in warnings_data:
-        warnings_data[guild_id] = {}
-    
-    if user_id not in warnings_data[guild_id]:
-        warnings_data[guild_id][user_id] = []
-    
-    warning = {
-        "moderator": ctx.author.id,
-        "reason": reason,
-        "timestamp": datetime.datetime.now().isoformat()
-    }
-    
-    warnings_data[guild_id][user_id].append(warning)
-    save_warnings_data(warnings_data)
-    
-    embed = discord.Embed(
-        title="⚠️ Member Warned",
-        description=f"{member.mention} has been warned by {ctx.author.mention}",
-        color=discord.Color.orange()
-    )
-    embed.add_field(name="Reason", value=reason, inline=False)
-    embed.add_field(name="Total Warnings", value=len(warnings_data[guild_id][user_id]), inline=False)
-    embed.set_footer(text=f"User ID: {member.id}")
-    
-    await ctx.send(embed=embed)
-    
-    try:
-        dm_embed = discord.Embed(
-            title=f"⚠️ You've been warned in {ctx.guild.name}",
-            color=discord.Color.orange()
-        )
-        dm_embed.add_field(name="Reason", value=reason, inline=False)
-        dm_embed.add_field(name="Moderator", value=ctx.author.mention, inline=False)
-        dm_embed.add_field(name="Total Warnings", value=len(warnings_data[guild_id][user_id]), inline=False)
-        await member.send(embed=dm_embed)
-    except discord.Forbidden:
-        pass
-
-@bot.command()
-async def warnings(ctx, member: discord.Member = None):
-    """Check a member's warnings. Usage: !warnings [@user]"""
-    target = member or ctx.author
-    warnings_data = get_warnings_data()
-    guild_id = str(ctx.guild.id)
-    user_id = str(target.id)
-    
-    if guild_id not in warnings_data or user_id not in warnings_data[guild_id] or not warnings_data[guild_id][user_id]:
-        return await ctx.send(f"{target.display_name} has no warnings.")
-    
-    warnings_list = warnings_data[guild_id][user_id]
-    
-    embed = discord.Embed(
-        title=f"⚠️ Warnings for {target.display_name}",
-        description=f"Total warnings: {len(warnings_list)}",
-        color=discord.Color.orange()
-    )
-    
-    for i, warning in enumerate(warnings_list, 1):
-        moderator = ctx.guild.get_member(warning["moderator"]) or f"User ID: {warning['moderator']}"
-        timestamp = datetime.datetime.fromisoformat(warning["timestamp"]).strftime("%Y-%m-%d %H:%M")
-        embed.add_field(
-            name=f"Warning #{i}",
-            value=f"**Reason:** {warning['reason']}\n**By:** {moderator}\n**On:** {timestamp}",
-            inline=False
-        )
-    
-    await ctx.send(embed=embed)
-
-@bot.command()
-@commands.has_permissions(manage_messages=True)
-async def clearwarns(ctx, member: discord.Member):
-    """Clear all warnings for a member. Usage: !clearwarns @user"""
-    warnings_data = get_warnings_data()
-    guild_id = str(ctx.guild.id)
-    user_id = str(member.id)
-    
-    if guild_id not in warnings_data or user_id not in warnings_data[guild_id]:
-        return await ctx.send(f"{member.display_name} has no warnings to clear.")
-    
-    warnings_data[guild_id].pop(user_id)
-    save_warnings_data(warnings_data)
-    
-    embed = discord.Embed(
-        title="✅ Warnings Cleared",
-        description=f"All warnings for {member.mention} have been cleared.",
-        color=discord.Color.green()
-    )
-    await ctx.send(embed=embed)
-
-@bot.command(aliases=['clear'])
-@commands.has_permissions(manage_messages=True)
-async def purge(ctx, amount: int = 10):
-    """Purge messages from the channel (default: 10). Usage: !purge [amount]"""
-    if amount <= 0 or amount > 100:
-        return await ctx.send("Please provide a number between 1 and 100.")
-    
-    deleted = await ctx.channel.purge(limit=amount + 1)
-    
-    embed = discord.Embed(
-        title="🗑️ Messages Purged",
-        description=f"Deleted {len(deleted) - 1} messages.",
-        color=discord.Color.green()
-    )
-    msg = await ctx.send(embed=embed, delete_after=5)
-
-@bot.command()
-@commands.has_permissions(manage_nicknames=True)
-async def resetnick(ctx, member: discord.Member):
-    """Reset a member's nickname. Usage: !resetnick @user"""
-    try:
-        old_nick = member.display_name
-        await member.edit(nick=None)
-        embed = discord.Embed(
-            title="✅ Nickname Reset",
-            description=f"{member.mention}'s nickname has been reset.",
-            color=discord.Color.green()
-        )
-        embed.add_field(name="Previous Nickname", value=old_nick, inline=True)
-        await ctx.send(embed=embed)
-    except Exception as e:
-        await ctx.send(f"❌ Failed to reset nickname: {e}")
-
-@bot.command()
-async def translate(ctx, target_lang: str, *, text: str):
-    """Translate text to another language. Usage: !translate <target_lang> <text>"""
-    try:
-        url = "https://translate.googleapis.com/translate_a/single"
-        params = {
-            'client': 'gtx',
-            'sl': 'auto',
-            'tl': target_lang,
-            'dt': 't',
-            'q': text
-        }
-        
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, params=params) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    translated_text = data[0][0][0]
-                    source_lang = data[2]
-                    
-                    embed = discord.Embed(
-                        title="🌍 Translation",
-                        color=discord.Color.blue()
-                    )
-                    embed.add_field(name=f"Original ({source_lang})", value=text, inline=False)
-                    embed.add_field(name=f"Translated ({target_lang})", value=translated_text, inline=False)
-                    await ctx.send(embed=embed)
-                else:
-                    await ctx.send("❌ Failed to translate text. Please try again later.")
-    except Exception as e:
-        await ctx.send(f"❌ Translation error: {e}")
-
-@bot.command()
-async def weather(ctx, *, location: str):
-    """Get weather for a location. Usage: !weather <city>"""
-    try:
-        if WEATHER_API_KEY == 'your_api_key_here':
-            return await ctx.send("Weather API is not configured.")
-            
-        base_url = "http://api.openweathermap.org/data/2.5/weather"
-        params = {
-            'q': location,
-            'appid': WEATHER_API_KEY,
-            'units': 'metric'
-        }
-        
-        async with aiohttp.ClientSession() as session:
-            async with session.get(base_url, params=params) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    
-                    city = data['name']
-                    country = data['sys']['country']
-                    temp = data['main']['temp']
-                    feels_like = data['main']['feels_like']
-                    humidity = data['main']['humidity']
-                    wind = data['wind']['speed']
-                    description = data['weather'][0]['description'].title()
-                    icon = data['weather'][0]['icon']
-                    
-                    embed = discord.Embed(
-                        title=f"⛅ Weather in {city}, {country}",
-                        description=f"**{description}**",
-                        color=discord.Color.blue()
-                    )
-                    embed.set_thumbnail(url=f"http://openweathermap.org/img/wn/{icon}@2x.png")
-                    embed.add_field(name="🌡️ Temperature", value=f"{temp}°C (Feels like {feels_like}°C)", inline=True)
-                    embed.add_field(name="💧 Humidity", value=f"{humidity}%", inline=True)
-                    embed.add_field(name="🌬️ Wind Speed", value=f"{wind} m/s", inline=True)
-                    
-                    await ctx.send(embed=embed)
-                else:
-                    await ctx.send("❌ Could not find weather for that location. Please check the spelling.")
-    except Exception as e:
-        await ctx.send(f"❌ Weather lookup error: {e}")
-
-@bot.command(aliases=['calc'])
-async def calculator(ctx, *, expression: str):
-    """Evaluate a math expression. Usage: !calc <expression>"""
-    try:
-        expr = expression.replace(' ', '')
-        if not re.match(r'^[\d+\-*/().^% ]+$', expr):
-            return await ctx.send("❌ Invalid characters in expression. Only numbers and +-*/^% operators allowed.")
-        
-        expr = expr.replace('^', '**')
-        result = eval(expr, {'__builtins__': None}, {})
-        
-        embed = discord.Embed(
-            title="🧮 Calculator",
-            color=discord.Color.blue()
-        )
-        embed.add_field(name="Expression", value=expression, inline=False)
-        embed.add_field(name="Result", value=str(result), inline=False)
-        await ctx.send(embed=embed)
-    except ZeroDivisionError:
-        await ctx.send("❌ Cannot divide by zero!")
-    except Exception as e:
-        await ctx.send(f"❌ Calculation error: {e}")
-
-@bot.command()
-@commands.has_permissions(manage_messages=True)
-async def mute(ctx, member: discord.Member, *, reason: str = "No reason provided"):
-    """Mute a member in text channels. Usage: !mute @user [reason]"""
-    try:
-        muted_role = discord.utils.get(ctx.guild.roles, name="Muted")
-        
-        if not muted_role:
-            muted_role = await ctx.guild.create_role(name="Muted")
-            
-            for channel in ctx.guild.channels:
-                await channel.set_permissions(muted_role,
-                    send_messages=False,
-                    speak=False,
-                    add_reactions=False
-                )
-        
-        await member.add_roles(muted_role, reason=reason)
-        
-        embed = discord.Embed(
-            title="🔇 Member Muted",
-            description=f"{member.mention} has been muted by {ctx.author.mention}",
-            color=discord.Color.red()
-        )
-        embed.add_field(name="Reason", value=reason, inline=False)
-        await ctx.send(embed=embed)
-        
-        try:
-            dm_embed = discord.Embed(
-                title=f"🔇 You've been muted in {ctx.guild.name}",
-                color=discord.Color.red()
-            )
-            dm_embed.add_field(name="Reason", value=reason, inline=False)
-            dm_embed.add_field(name="Moderator", value=ctx.author.mention, inline=False)
-            await member.send(embed=dm_embed)
-        except discord.Forbidden:
-            pass
-            
-    except Exception as e:
-        await ctx.send(f"❌ Failed to mute member: {e}")
-
-@bot.command()
-@commands.has_permissions(manage_messages=True)
-async def unmute(ctx, member: discord.Member):
-    """Unmute a member. Usage: !unmute @user"""
-    try:
-        muted_role = discord.utils.get(ctx.guild.roles, name="Muted")
-        
-        if not muted_role or muted_role not in member.roles:
-            return await ctx.send(f"{member.display_name} is not muted.")
-        
-        await member.remove_roles(muted_role)
-        
-        embed = discord.Embed(
-            title="🔊 Member Unmuted",
-            description=f"{member.mention} has been unmuted by {ctx.author.mention}",
-            color=discord.Color.green()
-        )
-        await ctx.send(embed=embed)
-        
-        try:
-            dm_embed = discord.Embed(
-                title=f"🔊 You've been unmuted in {ctx.guild.name}",
-                color=discord.Color.green()
-            )
-            await member.send(embed=dm_embed)
-        except discord.Forbidden:
-            pass
-            
-    except Exception as e:
-        await ctx.send(f"❌ Failed to unmute member: {e}")
-
-@bot.command()
-@commands.has_permissions(manage_channels=True)
-async def nuke(ctx, channel: discord.TextChannel = None):
-    """Clone and delete a channel to remove all messages. Usage: !nuke [channel]"""
-    target_channel = channel or ctx.channel
-    
-    confirmation = await ctx.send(f"⚠️ Are you sure you want to nuke {target_channel.mention}? This will delete ALL messages! React with ✅ to confirm.")
-    await confirmation.add_reaction("✅")
-    
-    def check(reaction, user):
-        return user == ctx.author and str(reaction.emoji) == "✅" and reaction.message.id == confirmation.id
-    
-    try:
-        await bot.wait_for('reaction_add', timeout=30.0, check=check)
-    except asyncio.TimeoutError:
-        await confirmation.edit(content="🚫 Channel nuke cancelled.")
-        return
-    
-    try:
-        new_channel = await target_channel.clone(reason=f"Channel nuked by {ctx.author}")
-        await target_channel.delete(reason=f"Channel nuked by {ctx.author}")
-        
-        embed = discord.Embed(
-            title="💥 Channel Nuked",
-            description=f"This channel has been nuked by {ctx.author.mention}",
-            color=discord.Color.red()
-        )
-        embed.set_image(url="https://media.giphy.com/media/oe33xf3B50fsc/giphy.gif")
-        await new_channel.send(embed=embed)
-    except Exception as e:
-        await ctx.send(f"❌ Failed to nuke channel: {e}")
-
-@bot.command()
-@commands.has_permissions(manage_channels=True)
-async def clone(ctx, channel: discord.TextChannel = None):
-    """Clone a text channel. Usage: !clone [channel]"""
-    target_channel = channel or ctx.channel
-    
-    try:
-        new_channel = await target_channel.clone()
-        await ctx.send(f"✅ Successfully cloned {target_channel.mention} to {new_channel.mention}")
-    except Exception as e:
-        await ctx.send(f"❌ Failed to clone channel: {e}")
-
-@bot.command()
-@commands.has_permissions(manage_channels=True)
-async def slowoff(ctx, channel: discord.TextChannel = None):
-    """Remove slowmode from a channel. Usage: !slowoff [channel]"""
-    target_channel = channel or ctx.channel
-    
-    try:
-        await target_channel.edit(slowmode_delay=0)
-        await ctx.send(f"✅ Slowmode removed from {target_channel.mention}")
-    except Exception as e:
-        await ctx.send(f"❌ Failed to remove slowmode: {e}")
-
-@bot.command()
-@commands.has_permissions(manage_roles=True)
-async def createrole(ctx, name: str, color: str = None, *, reason: str = None):
-    """Create a new role. Usage: !createrole <name> [hex color] [reason]"""
-    try:
-        role_color = discord.Color.default()
-        if color:
-            if color.startswith('#'):
-                color = color[1:]
-            try:
-                role_color = discord.Color(int(color, 16))
-            except ValueError:
-                await ctx.send("❌ Invalid color format. Use hex (e.g., #FF0000 or FF0000)")
-                return
-        
-        new_role = await ctx.guild.create_role(
-            name=name,
-            color=role_color,
-            reason=reason
-        )
-        
-        embed = discord.Embed(
-            title="✅ Role Created",
-            description=f"New role {new_role.mention} has been created",
-            color=role_color
-        )
-        if reason:
-            embed.add_field(name="Reason", value=reason, inline=False)
-        await ctx.send(embed=embed)
-    except Exception as e:
-        await ctx.send(f"❌ Failed to create role: {e}")
-
-@bot.command()
-@commands.has_permissions(manage_roles=True)
-async def deleterole(ctx, *, role: discord.Role):
-    """Delete a role. Usage: !deleterole @role"""
-    try:
-        await role.delete()
-        await ctx.send(f"✅ Role `{role.name}` has been deleted")
-    except Exception as e:
-        await ctx.send(f"❌ Failed to delete role: {e}")
-
-@bot.command()
-async def poll(ctx, question: str, *options: str):
-    """Create a poll. Usage: !poll "Question" "Option1" "Option2" ..."""
-    if len(options) < 2:
-        return await ctx.send("Please provide at least 2 options for the poll.")
-    if len(options) > 10:
-        return await ctx.send("You can only have up to 10 options.")
-    
-    emojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟']
-    
-    description = []
-    for i, option in enumerate(options):
-        description.append(f"{emojis[i]} {option}")
-    
-    embed = discord.Embed(
-        title=f"📊 Poll: {question}",
-        description="\n".join(description),
-        color=discord.Color.blue()
-    )
-    embed.set_footer(text=f"Poll created by {ctx.author.display_name}")
-    
-    message = await ctx.send(embed=embed)
-    
-    for i in range(len(options)):
-        await message.add_reaction(emojis[i])
-
-@bot.command()
-@commands.has_permissions(manage_channels=True)
-async def vc247(ctx):
-    """Make the bot stay in voice channel 24/7. Usage: !24-7vc"""
-    if not ctx.author.voice:
-        return await ctx.send("You need to be in a voice channel to use this command!")
-    
-    voice_client = ctx.voice_client
-    
-    if voice_client and voice_client.is_connected():
-        if voice_client.channel != ctx.author.voice.channel:
-            await voice_client.move_to(ctx.author.voice.channel)
-    else:
-        voice_client = await ctx.author.voice.channel.connect()
-    
-    PERMA_VC[ctx.guild.id] = True
-    
-    async def maintain_connection():
-        while PERMA_VC.get(ctx.guild.id, False):
-            if not voice_client.is_connected():
-                try:
-                    await ctx.author.voice.channel.connect()
-                except:
-                    pass
-            
-            await asyncio.sleep(10)  # Check every 10 seconds
-    
-    bot.loop.create_task(maintain_connection())
-    
-    await ctx.send("🔊 Bot will now stay in this voice channel 24/7. Use `!leave` to stop.")
-
-@bot.command()
-async def avatar(ctx, member: discord.Member = None):
-    """Get a user's avatar. Usage: !avatar [@user]"""
-    target = member or ctx.author
-    embed = discord.Embed(
-        title=f"{target.display_name}'s Avatar",
-        color=discord.Color.blue()
-    )
-    embed.set_image(url=target.avatar.url)
-    await ctx.send(embed=embed)
-
-@bot.command()
-async def serverinfo(ctx):
-    """Get server information. Usage: !serverinfo"""
-    guild = ctx.guild
-    embed = discord.Embed(
-        title=f"Server Info: {guild.name}",
-        color=discord.Color.blue()
-    )
-    embed.set_thumbnail(url=guild.icon.url)
-    
-    embed.add_field(name="Owner", value=guild.owner.mention, inline=True)
-    embed.add_field(name="Created", value=guild.created_at.strftime("%B %d, %Y"), inline=True)
-    embed.add_field(name="Members", value=guild.member_count, inline=True)
-    embed.add_field(name="Roles", value=len(guild.roles), inline=True)
-    embed.add_field(name="Channels", value=f"Text: {len(guild.text_channels)}\nVoice: {len(guild.voice_channels)}", inline=True)
-    embed.add_field(name="Boosts", value=guild.premium_subscription_count, inline=True)
-    
-    await ctx.send(embed=embed)
-
-@bot.command()
-async def userinfo(ctx, member: discord.Member = None):
-    """Get user information. Usage: !userinfo [@user]"""
-    target = member or ctx.author
-    embed = discord.Embed(
-        title=f"User Info: {target.display_name}",
-        color=discord.Color.blue()
-    )
-    embed.set_thumbnail(url=target.avatar.url)
-    
-    embed.add_field(name="ID", value=target.id, inline=True)
-    embed.add_field(name="Nickname", value=target.nick or "None", inline=True)
-    embed.add_field(name="Created", value=target.created_at.strftime("%B %d, %Y"), inline=True)
-    embed.add_field(name="Joined", value=target.joined_at.strftime("%B %d, %Y"), inline=True)
-    
-    roles = [role.mention for role in target.roles if role.name != "@everyone"]
-    embed.add_field(
-        name=f"Roles ({len(roles)})", 
-        value=" ".join(roles) if roles else "None", 
-        inline=False
-    )
-    
-    await ctx.send(embed=embed)
-
-@bot.command()
-async def remind(ctx, time: str, *, reminder: str):
-    """Set a reminder. Usage: !remind 1h30m Do homework"""
-    try:
-        seconds = 0
-        time_lower = time.lower()
-        
-        if 'd' in time_lower:
-            days = int(time_lower.split('d')[0])
-            seconds += days * 86400
-            time_lower = time_lower.split('d')[1]
-        if 'h' in time_lower:
-            hours = int(time_lower.split('h')[0])
-            seconds += hours * 3600
-            time_lower = time_lower.split('h')[1]
-        if 'm' in time_lower:
-            minutes = int(time_lower.split('m')[0])
-            seconds += minutes * 60
-            time_lower = time_lower.split('m')[1]
-        if 's' in time_lower:
-            secs = int(time_lower.split('s')[0])
-            seconds += secs
-        
-        if seconds <= 0:
-            return await ctx.send("Please provide a valid time greater than 0 seconds.")
-        
-        await ctx.send(f"⏰ I'll remind you in {time} about: {reminder}")
-        
-        await asyncio.sleep(seconds)
-        
-        embed = discord.Embed(
-            title="⏰ Reminder",
-            description=reminder,
-            color=discord.Color.gold()
-        )
-        embed.set_footer(text=f"You set this reminder {time} ago")
-        
-        await ctx.author.send(embed=embed)
-    except Exception as e:
-        await ctx.send(f"❌ Failed to set reminder: {e}\nUsage: `{PREFIX}remind 1h30m Do homework`")
+# --- Help Command ---
 
 class HelpCommand(commands.HelpCommand):
     def __init__(self):
@@ -2769,8 +3155,8 @@ async def on_voice_state_update(member, before, after):
                     del current_players[guild_id]
                 if guild_id in song_queues:
                     song_queues[guild_id].clear()
-# Apply Bot token heree
-TOKEN = os.getenv('DISCORD_TOKEN') or 'BOT_TOKEN'
+
+TOKEN = os.getenv('DISCORD_TOKEN') or 'YOUR_BOT_TOKEN_HERE'
 
 if __name__ == "__main__":
     try:
