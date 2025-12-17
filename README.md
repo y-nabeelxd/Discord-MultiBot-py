@@ -184,4 +184,3 @@ The bot now supports modern **slash commands** alongside traditional prefix comm
 **[y-nabeelxd](https://github.com/y-nabeelxd)**
 
 _If you like this project, star ⭐ the repository!_
-
