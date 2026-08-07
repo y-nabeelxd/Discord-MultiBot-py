@@ -10,7 +10,10 @@ and stream directly using bestaudio.
 import asyncio
 import yt_dlp
 import discord
+import aiohttp
+import urllib.parse
 from utils import format_duration
+from config import YT_API_KEY
 
 # ── yt-dlp options ────────────────────────────────────────────────────────────
 # IMPORTANT: Do NOT set extract_flat=True — that prevents stream URL extraction
@@ -58,8 +61,50 @@ class YTDLSource(discord.PCMVolumeTransformer):
         self.thumbnail: str | None = data.get("thumbnail")
 
     @classmethod
+    async def _youtube_api_search(cls, query: str, max_results: int = 1) -> list[dict]:
+        if not YT_API_KEY:
+            return []
+        
+        url = "https://www.googleapis.com/youtube/v3/search"
+        params = {
+            "part": "snippet",
+            "q": query,
+            "maxResults": max_results,
+            "type": "video",
+            "key": YT_API_KEY
+        }
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, params=params) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        results = []
+                        for item in data.get("items", []):
+                            video_id = item["id"]["videoId"]
+                            title = item["snippet"]["title"]
+                            results.append({
+                                "title": title,
+                                "url": f"https://www.youtube.com/watch?v={video_id}",
+                                "id": video_id,
+                                "thumbnail": f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
+                            })
+                        return results
+                    else:
+                        print(f"[Music] YouTube API error: {resp.status} {await resp.text()}")
+        except Exception as e:
+            print(f"[Music] YouTube API request failed: {e}")
+        return []
+
+    @classmethod
     async def from_url(cls, url: str, *, loop: asyncio.AbstractEventLoop = None, stream: bool = True):
         loop = loop or asyncio.get_event_loop()
+
+        # If it's a search query and we have an API key, resolve it first
+        if not url.startswith("http") and YT_API_KEY:
+            api_results = await cls._youtube_api_search(url, max_results=1)
+            if api_results:
+                url = api_results[0]["url"]
+
         # Run blocking yt-dlp call in executor to avoid blocking the event loop
         data = await loop.run_in_executor(
             None, lambda: ytdl.extract_info(url, download=not stream)
@@ -81,9 +126,17 @@ class YTDLSource(discord.PCMVolumeTransformer):
 
 async def search_youtube(query: str, max_results: int = 10) -> list[dict]:
     """
-    Search YouTube via yt-dlp's ytsearch without downloading.
+    Search YouTube. Uses YouTube API if key is available, else yt-dlp ytsearch.
     Returns list of {title, url, duration, thumbnail}.
     """
+    if YT_API_KEY:
+        api_results = await YTDLSource._youtube_api_search(query, max_results=max_results)
+        if api_results:
+            # YouTube API doesn't return duration in search snippet, so we set to N/A
+            for res in api_results:
+                res["duration"] = "N/A"
+            return api_results
+
     loop = asyncio.get_event_loop()
     search_opts = {
         **YTDL_FORMAT_OPTIONS,

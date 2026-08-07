@@ -15,6 +15,7 @@ BOT_OWNER: int | None = int(os.getenv("BOT_OWNER_ID")) if os.getenv("BOT_OWNER_I
 
 # ── Misc ──────────────────────────────────────────────────────────────────────
 WEATHER_API_KEY: str = os.getenv("WEATHER_API_KEY", "")
+YT_API_KEY: str = os.getenv("YT_API_KEY", "")
 COINFLIP_GIF: str = os.getenv(
     "COINFLIP_GIF",
     "https://cdn.dribbble.com/userupload/20764551/file/original-ec7c7b25323fea450739f13b38db735f.gif",
