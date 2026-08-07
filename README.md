@@ -105,6 +105,7 @@ BOT_OWNER_ID=your_discord_user_id
 
 # Optional
 WEATHER_API_KEY=your_openweathermap_key
+YT_COOKIES=cookies.txt
 
 # Enable verifications
 VERIFICATION_ROBLOX=true
