@@ -34,7 +34,11 @@ YTDL_FORMAT_OPTIONS = {
 }
 
 # If the user provides a cookies.txt file path via .env, tell yt-dlp to use it
+# Or just automatically use cookies.txt if it exists in the root folder
 yt_cookies = os.getenv("YT_COOKIES")
+if not yt_cookies and os.path.isfile("cookies.txt"):
+    yt_cookies = "cookies.txt"
+
 if yt_cookies and os.path.isfile(yt_cookies):
     YTDL_FORMAT_OPTIONS["cookiefile"] = yt_cookies
 
