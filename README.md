@@ -231,8 +231,8 @@ Users automatically earn 15-25 XP per minute while chatting.
 | **Roblox** | `!verifyroblox <username>` | ✅ Working |
 | **FiveM** | `!verifyfivem <name or ID>` | ✅ Working |
 | **FiveM Live** | `!fivemserverlive [#channel]` | ✅ Working |
-| **SA:MP** | `!verifysamp <playername>` | ⚠️ Maintenance |
-| **SA:MP Status** | `!sampstatus` | ⚠️ Maintenance |
+| **SA:MP** | `!verifysamp [code/name]` | ✅ Working (MySQL/RCON/Basic) |
+| **SA:MP Status** | `!sampstatus` | ✅ Working |
 | **Valorant** | `!verifyvalo <Name#Tag>` | ⚠️ Maintenance |
 
 Enable each system in your `.env` file.
