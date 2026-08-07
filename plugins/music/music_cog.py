@@ -238,7 +238,11 @@ class MusicCog(commands.Cog, name="Music"):
             if vc.channel != ctx.author.voice.channel:
                 await vc.move_to(ctx.author.voice.channel)
         else:
-            vc = await ctx.author.voice.channel.connect()
+            try:
+                vc = await ctx.author.voice.channel.connect(timeout=60.0, reconnect=True)
+            except discord.errors.ConnectionClosed:
+                await asyncio.sleep(2)
+                vc = await ctx.author.voice.channel.connect(timeout=60.0, reconnect=True)
         return vc
 
     # ── Commands ──────────────────────────────────────────────────────────────
@@ -246,6 +250,7 @@ class MusicCog(commands.Cog, name="Music"):
     @commands.hybrid_command(aliases=["p"])
     async def play(self, ctx: commands.Context, *, query: str):
         """Play a song or add to queue. Usage: !play <song name or URL>"""
+        await ctx.defer()
         vc = await self._ensure_voice(ctx)
         if not vc:
             return
@@ -427,6 +432,7 @@ class MusicCog(commands.Cog, name="Music"):
     @commands.hybrid_command()
     async def lyrics(self, ctx: commands.Context, *, query: str = None):
         """Get lyrics for a song. If no query provided, gets lyrics for current song."""
+        await ctx.defer()
         if not query:
             if ctx.guild.id in current_players:
                 player = current_players[ctx.guild.id].get("player")
