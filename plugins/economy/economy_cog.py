@@ -218,5 +218,141 @@ class EconomyCog(commands.Cog, name="Economy"):
         await ctx.send(embed=embed)
 
 
+
+    @commands.command(name=f"{GAME_PREFIX}work")
+    async def work(self, ctx: commands.Context):
+        """Work to earn coins. Usage: owo work"""
+        data = get_owo_data()
+        uid = str(ctx.author.id)
+        _ensure_user(data, uid)
+
+        now = datetime.datetime.now()
+        last_work_str = data[uid].get("last_work")
+        
+        if last_work_str:
+            last = datetime.datetime.fromisoformat(last_work_str)
+            diff = datetime.timedelta(hours=1)
+            if now - last < diff:
+                remaining = diff - (now - last)
+                m = remaining.seconds // 60
+                s = remaining.seconds % 60
+                return await ctx.send(f"⏳ You are too tired to work! Try again in **{m}m {s}s**.")
+
+        amount = random.randint(100, 800)
+        jobs = [
+            "fixed a discord bug", "won a coding competition", "walked some dogs", 
+            "sold lemonade", "mined some crypto", "robbed a bank (successfully)", 
+            "delivered pizzas"
+        ]
+        job = random.choice(jobs)
+        
+        data[uid]["balance"] += amount
+        data[uid]["last_work"] = now.isoformat()
+        save_owo_data(data)
+
+        embed = discord.Embed(
+            title="💼 Hard Work Pays Off",
+            description=f"You {job} and earned **{amount} coins**!\\nNew Balance: **{data[uid]['balance']} coins**",
+            color=discord.Color.green(),
+        )
+        await ctx.send(embed=embed)
+
+    @commands.command(name=f"{GAME_PREFIX}pay", aliases=[f"{GAME_PREFIX}give"])
+    async def pay(self, ctx: commands.Context, member: discord.Member, amount: int):
+        """Pay someone coins. Usage: owo pay @user <amount>"""
+        if amount <= 0:
+            return await ctx.send("❌ Amount must be greater than 0!")
+        if member.id == ctx.author.id:
+            return await ctx.send("❌ You cannot pay yourself!")
+        if member.bot:
+            return await ctx.send("❌ You cannot pay bots!")
+
+        data = get_owo_data()
+        uid_sender = str(ctx.author.id)
+        uid_receiver = str(member.id)
+        
+        _ensure_user(data, uid_sender)
+        _ensure_user(data, uid_receiver)
+
+        if data[uid_sender]["balance"] < amount:
+            return await ctx.send("❌ You don't have enough coins!")
+
+        data[uid_sender]["balance"] -= amount
+        data[uid_receiver]["balance"] += amount
+        save_owo_data(data)
+
+        embed = discord.Embed(
+            title="💸 Payment Successful",
+            description=f"You paid **{amount} coins** to {member.mention}.\\nYour new balance: **{data[uid_sender]['balance']} coins**",
+            color=discord.Color.green(),
+        )
+        await ctx.send(embed=embed)
+
+    @commands.command(name=f"{GAME_PREFIX}rob", aliases=[f"{GAME_PREFIX}steal"])
+    async def rob(self, ctx: commands.Context, member: discord.Member):
+        """Attempt to rob someone. Usage: owo rob @user"""
+        if member.id == ctx.author.id:
+            return await ctx.send("❌ You cannot rob yourself!")
+        if member.bot:
+            return await ctx.send("❌ You cannot rob bots!")
+
+        data = get_owo_data()
+        uid_sender = str(ctx.author.id)
+        uid_receiver = str(member.id)
+        
+        _ensure_user(data, uid_sender)
+        _ensure_user(data, uid_receiver)
+
+        now = datetime.datetime.now()
+        last_rob_str = data[uid_sender].get("last_rob")
+        
+        if last_rob_str:
+            last = datetime.datetime.fromisoformat(last_rob_str)
+            diff = datetime.timedelta(hours=2)
+            if now - last < diff:
+                remaining = diff - (now - last)
+                h = remaining.seconds // 3600
+                m = (remaining.seconds % 3600) // 60
+                return await ctx.send(f"🚔 The cops are looking for you! Lay low for **{h}h {m}m**.")
+
+        if data[uid_sender]["balance"] < 500:
+            return await ctx.send("❌ You need at least 500 coins to plan a robbery (in case you get fined).")
+            
+        if data[uid_receiver]["balance"] < 200:
+            return await ctx.send(f"❌ {member.display_name} is too poor to rob. Leave them alone!")
+
+        data[uid_sender]["last_rob"] = now.isoformat()
+        
+        # 40% chance of success
+        success = random.random() < 0.40
+        
+        if success:
+            # Rob between 10% and 30% of their balance
+            steal_pct = random.uniform(0.1, 0.3)
+            amount = int(data[uid_receiver]["balance"] * steal_pct)
+            
+            data[uid_sender]["balance"] += amount
+            data[uid_receiver]["balance"] -= amount
+            
+            embed = discord.Embed(
+                title="🥷 Robbery Successful!",
+                description=f"You sneaked away with **{amount} coins** from {member.mention}!\\nYour new balance: **{data[uid_sender]['balance']} coins**",
+                color=discord.Color.green(),
+            )
+        else:
+            # Fine is 15% of your own balance
+            fine = int(data[uid_sender]["balance"] * 0.15)
+            data[uid_sender]["balance"] -= fine
+            
+            embed = discord.Embed(
+                title="🚨 BUSTED!",
+                description=f"You got caught trying to rob {member.mention} and were fined **{fine} coins**!\\nYour new balance: **{data[uid_sender]['balance']} coins**",
+                color=discord.Color.red(),
+            )
+
+        save_owo_data(data)
+        await ctx.send(embed=embed)
+
 async def setup(bot: commands.Bot):
+
     await bot.add_cog(EconomyCog(bot))

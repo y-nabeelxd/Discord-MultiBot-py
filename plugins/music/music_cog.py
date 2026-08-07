@@ -423,5 +423,49 @@ class MusicCog(commands.Cog, name="Music"):
                 song_queues.get(guild_id, []).clear()
 
 
+
+    @commands.command()
+    async def lyrics(self, ctx: commands.Context, *, query: str = None):
+        """Get lyrics for a song. If no query provided, gets lyrics for current song."""
+        if not query:
+            if ctx.guild.id in current_players:
+                player = current_players[ctx.guild.id].get("player")
+                if player and player.title:
+                    query = player.title
+            
+            if not query:
+                return await ctx.send("❌ Please provide a song name or play a song first.")
+                
+        msg = await ctx.send(f"🔍 Searching lyrics for {query}...")
+        
+        try:
+            import aiohttp
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"https://some-random-api.com/lyrics?title={query}") as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        lyrics = data.get("lyrics", "")
+                        title = data.get("title", query)
+                        author = data.get("author", "Unknown")
+                        
+                        if len(lyrics) > 4000:
+                            lyrics = lyrics[:3997] + "..."
+                            
+                        embed = discord.Embed(title=f"{title} - {author}", description=lyrics, color=discord.Color.blurple())
+                        
+                        try:
+                            thumbnail = data.get("thumbnail", {}).get("genius")
+                            if thumbnail:
+                                embed.set_thumbnail(url=thumbnail)
+                        except Exception:
+                            pass
+                            
+                        await msg.edit(content=None, embed=embed)
+                    else:
+                        await msg.edit(content=f"❌ Couldn't find lyrics for {query}.")
+        except Exception as e:
+            await msg.edit(content=f"❌ Error fetching lyrics: {e}")
+
 async def setup(bot: commands.Bot):
+
     await bot.add_cog(MusicCog(bot))

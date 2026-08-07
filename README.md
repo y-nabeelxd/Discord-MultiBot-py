@@ -160,6 +160,7 @@ python bot.py
 | Command | Description |
 |---------|-------------|
 | `!play <song or URL>` | Search YouTube and play — shows a select menu |
+| `!lyrics [song]` | Get song lyrics |
 | `!skip` | Skip the current song |
 | `!pause` | Pause playback |
 | `!resume` | Resume playback |
@@ -247,6 +248,9 @@ Enable each system in your `.env` file.
 | `owo balance [@user]` | Check your balance |
 | `owo coinflip <amount> [heads/tails]` | Bet on a coin flip |
 | `owo slots <amount>` | Spin the slot machine |
+| `owo work` | Work to earn coins |
+| `owo pay @user <amount>` | Transfer coins to friends |
+| `owo rob @user` | Try to steal coins |
 
 ---
 
@@ -260,7 +264,9 @@ Enable each system in your `.env` file.
 | `!guess <1-10>` | Guess the secret number |
 | `!8ball <question>` | Ask the magic 8-ball |
 | `!tictactoe @user` | Play Tic-Tac-Toe via buttons |
-| `!trivia` | Play a random trivia question |
+| `!meme` | Get a random meme |
+| `!ship @user` | Love compatibility calculator |
+| `!minesweeper` | Play minesweeper (spoiler tags) |
 | `!slap @user` | Slap someone! |
 | `!kiss @user` | Kiss someone! |
 | `!hug @user` | Hug someone! |
@@ -274,6 +280,8 @@ Enable each system in your `.env` file.
 | `!translate <lang> <text>` | Translate text |
 | `!weather <city>` | Current weather |
 | `!calc <expression>` | Math calculator |
+| `!botinfo` | Bot stats and uptime |
+| `!roleinfo @role` | Role details and permissions |
 | `!poll "Q" "A" "B"` | Create a reaction poll |
 | `!remind <time> <msg>` | Set a reminder (e.g. `1h30m`) |
 | `!vc247` | Keep bot in VC 24/7 |

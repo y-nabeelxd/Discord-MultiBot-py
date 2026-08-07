@@ -286,5 +286,111 @@ class FunCog(commands.Cog, name="Fun"):
         view.message = msg
 
 
+
+    @commands.command()
+    async def meme(self, ctx: commands.Context):
+        """Get a random meme from Reddit."""
+        msg = await ctx.send("Fetching a fresh meme...")
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get("https://meme-api.com/gimme") as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        embed = discord.Embed(title=data.get("title", "Meme"), url=data.get("postLink"), color=discord.Color.random())
+                        embed.set_image(url=data.get("url"))
+                        embed.set_footer(text=f"👍 {data.get('ups', 0)} | r/{data.get('subreddit')}")
+                        await msg.edit(content=None, embed=embed)
+                    else:
+                        await msg.edit(content="❌ Couldn't fetch a meme right now.")
+        except Exception:
+            await msg.edit(content="❌ An error occurred while fetching the meme.")
+
+    @commands.command()
+    async def ship(self, ctx: commands.Context, user1: discord.Member, user2: discord.Member = None):
+        """Calculate the love compatibility between two users."""
+        if not user2:
+            user2 = user1
+            user1 = ctx.author
+
+        if user1 == user2:
+            return await ctx.send("You can't ship someone with themselves! 💔")
+
+        # Create a deterministic seed based on their IDs so the result is always the same for the pair
+        random.seed(user1.id + user2.id)
+        percentage = random.randint(0, 100)
+        random.seed() # reset seed
+
+        bars = int((percentage / 100) * 10)
+        progress_bar = "█" * bars + "░" * (10 - bars)
+
+        if percentage >= 90:
+            emoji = "💖"
+            comment = "True Love!"
+        elif percentage >= 70:
+            emoji = "💕"
+            comment = "Great Match!"
+        elif percentage >= 40:
+            emoji = "❤️"
+            comment = "There's potential."
+        elif percentage >= 20:
+            emoji = "💔"
+            comment = "Might be tough."
+        else:
+            emoji = "💀"
+            comment = "Absolutely not."
+
+        embed = discord.Embed(
+            title=f"Love Calculator {emoji}",
+            description=f"**{user1.display_name}** x **{user2.display_name}**\n\n**{percentage}%** `[{progress_bar}]`\n*\"{comment}\"*",
+            color=discord.Color.pink()
+        )
+        await ctx.send(embed=embed)
+
+    @commands.command(aliases=["ms"])
+    async def minesweeper(self, ctx: commands.Context):
+        """Play a game of minesweeper."""
+        columns = 9
+        rows = 9
+        bombs = 10
+
+        grid = [[0 for _ in range(columns)] for _ in range(rows)]
+        bomb_positions = []
+
+        while len(bomb_positions) < bombs:
+            x = random.randint(0, columns - 1)
+            y = random.randint(0, rows - 1)
+            if (x, y) not in bomb_positions:
+                bomb_positions.append((x, y))
+                grid[y][x] = 'B'
+
+        for y in range(rows):
+            for x in range(columns):
+                if grid[y][x] == 'B':
+                    continue
+                count = 0
+                for dy in [-1, 0, 1]:
+                    for dx in [-1, 0, 1]:
+                        if dy == 0 and dx == 0:
+                            continue
+                        nx, ny = x + dx, y + dy
+                        if 0 <= nx < columns and 0 <= ny < rows and grid[ny][nx] == 'B':
+                            count += 1
+                grid[y][x] = count
+
+        number_emojis = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣"]
+        board_str = ""
+        for y in range(rows):
+            for x in range(columns):
+                val = grid[y][x]
+                if val == 'B':
+                    emoji = "💣"
+                else:
+                    emoji = number_emojis[val]
+                board_str += f"||{emoji}||"
+            board_str += "\n"
+
+        await ctx.send(f"**Minesweeper** ({bombs} bombs)\n{board_str}")
+
 async def setup(bot: commands.Bot):
+
     await bot.add_cog(FunCog(bot))
