@@ -7,6 +7,7 @@ return YouTube watch URLs instead of actual audio stream URLs.
 We now use ytsearch: for search (no HTML scraping), remove extract_flat,
 and stream directly using bestaudio.
 """
+import os
 import asyncio
 import yt_dlp
 import discord
@@ -33,6 +34,11 @@ YTDL_FORMAT_OPTIONS = {
     # Bypass YouTube's bot sign-in prompt by spoofing an Android VR client
     "extractor_args": {"youtube": {"player_client": ["android_vr"]}},
 }
+
+# If the user provides a cookies.txt file path via .env, tell yt-dlp to use it
+yt_cookies = os.getenv("YT_COOKIES")
+if yt_cookies and os.path.isfile(yt_cookies):
+    YTDL_FORMAT_OPTIONS["cookiefile"] = yt_cookies
 
 FFMPEG_OPTIONS = {
     "before_options": (
