@@ -417,52 +417,157 @@ class VerificationCog(commands.Cog, name="Verification"):
             await ctx.send(f"🔴 Error: {e}")
 
     @commands.command()
-    async def verifysamp(self, ctx: commands.Context, *, playername: str):
-        """Verify a SA-MP account. Usage: !verifysamp PlayerName"""
+    async def verifysamp(self, ctx: commands.Context, *, arg: str):
+        """Verify a SA-MP account. Usage: !verifysamp [Code or PlayerName]"""
         if not config.VERIFICATION_SAMP:
             return await ctx.send("❌ SA-MP verification is disabled.")
-        if not config.SAMP_SERVER_IP or not config.SAMP_SERVER_PORT:
-            return await ctx.send("❌ SA-MP server not configured.")
+        
+        role = None
+        if config.SAMP_ROLE_ID:
+            role = ctx.guild.get_role(config.SAMP_ROLE_ID)
+        if not role:
+            for r in ctx.guild.roles:
+                if r.name.lower() not in ["@everyone", "bot"] and r < ctx.guild.me.top_role:
+                    role = r
+                    break
 
-        msg = await ctx.send(f"🔍 Checking SA-MP server…")
-        try:
-            client = SampClient(ip=config.SAMP_SERVER_IP, port=config.SAMP_SERVER_PORT)
-            players_data = await client.players()
-            players = [p.name for p in players_data.players]
-            player = next((p for p in players if p.lower() == playername.lower()), None)
+        if not role:
+            return await ctx.send("❌ No valid role found!")
 
-            if not player:
-                pl_list = "\n".join(players[:10])
-                return await msg.edit(content=f"❌ Player `{playername}` not found.\nCurrent players:\n{pl_list}")
-
-            role = None
-            if config.SAMP_ROLE_ID:
-                role = ctx.guild.get_role(config.SAMP_ROLE_ID)
-            if not role:
-                for r in ctx.guild.roles:
-                    if r.name.lower() not in ["@everyone", "bot"] and r < ctx.guild.me.top_role:
-                        role = r
-                        break
-
-            if not role:
-                return await msg.edit(content="❌ No valid role found!")
-
-            await ctx.author.add_roles(role)
-            if config.CHANGE_NICKNAME:
+        verif_type = config.SAMP_VERIF_TYPE
+        
+        if verif_type == "mysql":
+            code = arg.strip()
+            msg = await ctx.send("🔍 Checking database for your code...")
+            try:
+                import aiomysql
+                pool = await aiomysql.create_pool(
+                    host=config.SAMP_DB_HOST,
+                    user=config.SAMP_DB_USER,
+                    password=config.SAMP_DB_PASSWORD,
+                    db=config.SAMP_DB_NAME,
+                    autocommit=True
+                )
+                async with pool.acquire() as conn:
+                    async with conn.cursor(aiomysql.DictCursor) as cur:
+                        query = f"SELECT {config.SAMP_DB_COL_USERNAME} FROM {config.SAMP_DB_TABLE} WHERE {config.SAMP_DB_COL_VERIFY_CODE} = %s"
+                        await cur.execute(query, (code,))
+                        result = await cur.fetchone()
+                        
+                        if not result:
+                            pool.close()
+                            await pool.wait_closed()
+                            return await msg.edit(content="❌ Code not found in the database.")
+                            
+                        username = result[config.SAMP_DB_COL_USERNAME]
+                        
+                        # Link account and clear code
+                        update_query = f"UPDATE {config.SAMP_DB_TABLE} SET {config.SAMP_DB_COL_VERIFY_CODE} = '', {config.SAMP_DB_COL_DISCORD_ID} = %s WHERE {config.SAMP_DB_COL_USERNAME} = %s"
+                        await cur.execute(update_query, (str(ctx.author.id), username))
+                        
+                pool.close()
+                await pool.wait_closed()
+                
+                await ctx.author.add_roles(role)
+                if config.CHANGE_NICKNAME:
+                    try:
+                        await ctx.author.edit(nick=username)
+                    except discord.Forbidden:
+                        pass
+                embed = discord.Embed(title="✅ Verification Successful", description=f"Linked to SA-MP account: **{username}**", color=discord.Color.green())
+                await msg.edit(content=None, embed=embed)
+            except ImportError:
+                await msg.edit(content="❌ MySQL verification is enabled but aiomysql is not installed.")
+            except Exception as e:
+                await msg.edit(content=f"❌ Database error: {e}")
+                
+        elif verif_type == "rcon":
+            import random
+            playername = arg.strip()
+            if not config.SAMP_SERVER_IP or not config.SAMP_SERVER_PORT:
+                return await ctx.send("❌ SA-MP server IP/Port not configured.")
+            if not config.SAMP_RCON_PASSWORD:
+                return await ctx.send("❌ SA-MP RCON password not configured.")
+                
+            msg = await ctx.send(f"🔍 Sending RCON message to {playername}...")
+            
+            code = str(random.randint(100000, 999999))
+            cmd = config.SAMP_RCON_CMD_FORMAT.replace("{player}", playername).replace("{code}", code)
+            
+            import struct, socket
+            try:
+                ip_split = config.SAMP_SERVER_IP.split('.')
+                ip_bytes = struct.pack('BBBB', int(ip_split[0]), int(ip_split[1]), int(ip_split[2]), int(ip_split[3]))
+                port_bytes = struct.pack('<H', config.SAMP_SERVER_PORT)
+                packet = b'SAMP' + ip_bytes + port_bytes + b'x'
+                pass_bytes = config.SAMP_RCON_PASSWORD.encode('windows-1252')
+                packet += struct.pack('<H', len(pass_bytes)) + pass_bytes
+                cmd_bytes = cmd.encode('windows-1252')
+                packet += struct.pack('<H', len(cmd_bytes)) + cmd_bytes
+                
+                import asyncio
+                loop = asyncio.get_event_loop()
+                def _send():
+                    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                        s.settimeout(2.0)
+                        s.sendto(packet, (config.SAMP_SERVER_IP, config.SAMP_SERVER_PORT))
+                        try:
+                            s.recvfrom(4096)
+                        except socket.timeout:
+                            pass
+                await loop.run_in_executor(None, _send)
+                
+                await msg.edit(content=f"✅ An in-game message has been sent to {playername}. Please check your game chat and reply here with the 6-digit code within 2 minutes.")
+                
+                def check(m):
+                    return m.author == ctx.author and m.channel == ctx.channel and m.content.strip() == code
+                    
                 try:
-                    await ctx.author.edit(nick=player)
-                except discord.Forbidden:
-                    pass
-
-            embed = discord.Embed(
-                title="✅ SA-MP Verification Successful",
-                description=f"{ctx.author.mention} verified as `{player}`",
-                color=discord.Color.green(),
-            )
-            await msg.edit(content=None, embed=embed)
-        except Exception as e:
-            await msg.edit(content=f"❌ Error: {e}")
-
+                    await self.bot.wait_for('message', check=check, timeout=120.0)
+                    await ctx.author.add_roles(role)
+                    if config.CHANGE_NICKNAME:
+                        try:
+                            await ctx.author.edit(nick=playername)
+                        except discord.Forbidden:
+                            pass
+                    embed = discord.Embed(title="✅ Verification Successful", description=f"Linked to SA-MP account: **{playername}**", color=discord.Color.green())
+                    await ctx.send(embed=embed)
+                except asyncio.TimeoutError:
+                    await ctx.send("⏳ Verification timed out. Please try again.")
+            except Exception as e:
+                await msg.edit(content=f"❌ RCON error: {e}")
+                
+        else:
+            playername = arg.strip()
+            if not config.SAMP_SERVER_IP or not config.SAMP_SERVER_PORT:
+                return await ctx.send("❌ SA-MP server IP/Port not configured.")
+                
+            msg = await ctx.send(f"🔍 Checking SA-MP server (Basic Method)…")
+            try:
+                client = SampClient(ip=config.SAMP_SERVER_IP, port=config.SAMP_SERVER_PORT)
+                players_data = await client.players()
+                players = [p.name for p in players_data.players]
+                player = next((p for p in players if p.lower() == playername.lower()), None)
+    
+                if not player:
+                    pl_list = "\\n".join(players[:10])
+                    return await msg.edit(content=f"❌ Player {playername} not found.\\nCurrent players:\\n{pl_list}")
+    
+                await ctx.author.add_roles(role)
+                if config.CHANGE_NICKNAME:
+                    try:
+                        await ctx.author.edit(nick=player)
+                    except discord.Forbidden:
+                        pass
+    
+                embed = discord.Embed(
+                    title="✅ SA-MP Verification Successful",
+                    description=f"Verified as **{player}**",
+                    color=discord.Color.green(),
+                )
+                await msg.edit(content=None, embed=embed)
+            except Exception as e:
+                await msg.edit(content=f"❌ Failed: {e}")
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(VerificationCog(bot))

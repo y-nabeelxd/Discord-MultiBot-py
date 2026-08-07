@@ -43,6 +43,22 @@ SAMP_SERVER_IP: str | None = os.getenv("SAMP_SERVER_IP")
 SAMP_SERVER_PORT: int | None = int(os.getenv("SAMP_SERVER_PORT")) if os.getenv("SAMP_SERVER_PORT") else None
 SAMP_ROLE_ID: int | None = int(os.getenv("SAMP_ROLE_ID")) if os.getenv("SAMP_ROLE_ID") else None
 
+SAMP_VERIF_TYPE: str = os.getenv("SAMP_VERIF_TYPE", "basic").lower()
+
+# MySQL config
+SAMP_DB_HOST: str = os.getenv("SAMP_DB_HOST", "localhost")
+SAMP_DB_USER: str = os.getenv("SAMP_DB_USER", "root")
+SAMP_DB_PASSWORD: str = os.getenv("SAMP_DB_PASSWORD", "")
+SAMP_DB_NAME: str = os.getenv("SAMP_DB_NAME", "samp_server")
+SAMP_DB_TABLE: str = os.getenv("SAMP_DB_TABLE", "players")
+SAMP_DB_COL_USERNAME: str = os.getenv("SAMP_DB_COL_USERNAME", "name")
+SAMP_DB_COL_VERIFY_CODE: str = os.getenv("SAMP_DB_COL_VERIFY_CODE", "verify_code")
+SAMP_DB_COL_DISCORD_ID: str = os.getenv("SAMP_DB_COL_DISCORD_ID", "discord_id")
+
+# RCON config
+SAMP_RCON_PASSWORD: str = os.getenv("SAMP_RCON_PASSWORD", "")
+SAMP_RCON_CMD_FORMAT: str = os.getenv("SAMP_RCON_CMD_FORMAT", "pm {player} Your verification code is {code}")
+
 # ── Valorant Verification ─────────────────────────────────────────────────────
 VERIFICATION_VALO: bool = os.getenv("VERIFICATION_VALO", "false").lower() == "true"
 RIOT_API_KEY: str | None = os.getenv("RIOT_API_KEY")
