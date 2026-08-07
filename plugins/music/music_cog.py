@@ -236,44 +236,54 @@ class MusicCog(commands.Cog, name="Music"):
         if not ctx.author.voice:
             await ctx.send("❌ You need to be in a voice channel to play music!")
             return None
+
         vc = ctx.voice_client
         if vc and vc.is_connected():
             if vc.channel != ctx.author.voice.channel:
                 await vc.move_to(ctx.author.voice.channel)
-        else:
-            # Force-disconnect any ghost/dead voice session first
-            if ctx.guild.voice_client:
+            return vc
+
+        # Helper: forcefully nuke any ghost/stale voice session
+        async def _cleanup_voice():
+            existing = ctx.guild.voice_client
+            if existing:
                 try:
-                    await ctx.guild.voice_client.disconnect(force=True)
-                    await asyncio.sleep(0.5)
+                    existing.cleanup()
                 except Exception:
                     pass
-            # reconnect=False prevents discord.py from internally looping 5 times on 4017.
-            # We handle the retry ourselves with a short delay below.
-            try:
-                vc = await ctx.author.voice.channel.connect(timeout=15.0, reconnect=False)
-            except discord.errors.ConnectionClosed as e:
-                # 4017 = Discord's regional voice server rejected the WS handshake.
-                # Wait briefly and try once more.
-                print(f"[Music] Voice connection failed (code {e.code}), retrying once...")
-                await asyncio.sleep(2)
                 try:
-                    vc = await ctx.author.voice.channel.connect(timeout=15.0, reconnect=False)
-                except Exception as e2:
-                    print(f"[Music] Voice connection permanently failed: {e2}")
-                    await ctx.send(
-                        "❌ **Discord Voice Server Error (4017)**\n"
-                        "Discord's voice servers for your region are rejecting the connection.\n\n"
-                        "💡 **To fix this:** Right-click your Voice Channel → **Edit Channel** → "
-                        "set **Region Override** to **Singapore**, **US East**, or **Europe** — "
-                        "then try `/play` again!"
-                    )
-                    return None
-            except Exception as e:
-                print(f"[Music] Unexpected voice connection error: {e}")
-                await ctx.send(f"❌ Failed to join voice channel: `{e}`")
-                return None
-        return vc
+                    await existing.disconnect(force=True)
+                except Exception:
+                    pass
+                await asyncio.sleep(1.0)
+
+        await _cleanup_voice()
+
+        # Attempt 1
+        try:
+            vc = await ctx.author.voice.channel.connect(timeout=15.0, reconnect=False)
+            return vc
+        except (discord.errors.ConnectionClosed, discord.ClientException) as e:
+            code = getattr(e, 'code', 'N/A')
+            print(f"[Music] Voice connection attempt 1 failed (code {code}): {e}")
+
+        # Clean up again — 4006/stale sessions leave a ghost vc behind
+        await _cleanup_voice()
+        await asyncio.sleep(1.0)
+
+        # Attempt 2
+        try:
+            vc = await ctx.author.voice.channel.connect(timeout=15.0, reconnect=False)
+            return vc
+        except Exception as e2:
+            print(f"[Music] Voice connection attempt 2 failed: {e2}")
+            await ctx.send(
+                "❌ **Could not connect to voice channel.**\n"
+                "Discord's voice server rejected the connection twice.\n\n"
+                "💡 Try: **kick the bot** from voice (if it appears stuck), then use `/play` again.\n"
+                "If this keeps happening, change the Voice Channel's **Region Override** to **Rotterdam**."
+            )
+            return None
 
     # ── Commands ──────────────────────────────────────────────────────────────
 
