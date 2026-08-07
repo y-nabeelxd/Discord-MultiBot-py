@@ -30,7 +30,8 @@ YTDL_FORMAT_OPTIONS = {
     "default_search": "ytsearch",   # use yt-dlp's own search — no scraping needed
     "source_address": "0.0.0.0",
     "verbose": False,
-    # Removed extract_flat — it was the root cause of play failures
+    # Bypass YouTube's bot sign-in prompt by spoofing an Android VR client
+    "extractor_args": {"youtube": {"player_client": ["android_vr"]}},
 }
 
 FFMPEG_OPTIONS = {
