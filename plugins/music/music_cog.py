@@ -238,11 +238,22 @@ class MusicCog(commands.Cog, name="Music"):
             if vc.channel != ctx.author.voice.channel:
                 await vc.move_to(ctx.author.voice.channel)
         else:
+            if ctx.guild.voice_client:
+                try:
+                    await ctx.guild.voice_client.disconnect(force=True)
+                except Exception:
+                    pass
             try:
-                vc = await ctx.author.voice.channel.connect(timeout=60.0, reconnect=True)
-            except discord.errors.ConnectionClosed:
-                await asyncio.sleep(2)
-                vc = await ctx.author.voice.channel.connect(timeout=60.0, reconnect=True)
+                vc = await ctx.author.voice.channel.connect(timeout=20.0, reconnect=True)
+            except Exception as e:
+                print(f"[Music] Connection attempt 1 failed: {e}")
+                await asyncio.sleep(1)
+                try:
+                    vc = await ctx.author.voice.channel.connect(timeout=20.0, reconnect=True)
+                except Exception as e2:
+                    print(f"[Music] Connection attempt 2 failed: {e2}")
+                    await ctx.send("❌ **Discord Voice Server Error (4017)**: Discord's voice servers are currently rejecting the connection for this region.\n\n💡 **Fix:** Edit this Voice Channel's settings and change the **Region Override** (e.g., from Automatic to Singapore or Europe), then try again!")
+                    return None
         return vc
 
     # ── Commands ──────────────────────────────────────────────────────────────
