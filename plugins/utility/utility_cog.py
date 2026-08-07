@@ -1,4 +1,4 @@
-﻿"""
+"""
 plugins/utility/utility_cog.py
 Utility commands: weather, translate, poll, remind, avatar, server/user info, vc247, calculator.
 """
@@ -59,7 +59,7 @@ class UtilityCog(commands.Cog, name="Utility"):
                 except discord.Forbidden:
                     pass
 
-    @commands.command()
+    @commands.hybrid_command()
     async def snipe(self, ctx: commands.Context):
         """Get the last deleted message in this channel. Usage: !snipe"""
         snipe_data = self.snipes.get(ctx.channel.id)
@@ -78,7 +78,7 @@ class UtilityCog(commands.Cog, name="Utility"):
         embed.set_footer(text="Sniped message")
         await ctx.send(embed=embed)
 
-    @commands.command()
+    @commands.hybrid_command()
     async def afk(self, ctx: commands.Context, *, reason: str = "AFK"):
         """Set your status to AFK. Usage: !afk [reason]"""
         data = get_afk_data()
@@ -86,7 +86,7 @@ class UtilityCog(commands.Cog, name="Utility"):
         save_afk_data(data)
         await ctx.send(f"âœ… {ctx.author.mention} I set your AFK: {reason}")
 
-    @commands.command(aliases=["calc"])
+    @commands.hybrid_command(aliases=["calc"])
     async def calculator(self, ctx: commands.Context, *, expression: str):
         """Evaluate a math expression. Usage: !calc <expression>"""
         try:
@@ -103,7 +103,7 @@ class UtilityCog(commands.Cog, name="Utility"):
         except Exception as e:
             await ctx.send(f"âŒ Calculation error: {e}")
 
-    @commands.command()
+    @commands.hybrid_command()
     async def translate(self, ctx: commands.Context, target_lang: str, *, text: str):
         """Translate text. Usage: !translate <lang_code> <text>"""
         try:
@@ -123,7 +123,7 @@ class UtilityCog(commands.Cog, name="Utility"):
         except Exception as e:
             await ctx.send(f"âŒ Translation error: {e}")
 
-    @commands.command()
+    @commands.hybrid_command()
     async def weather(self, ctx: commands.Context, *, location: str):
         """Get weather for a location. Usage: !weather <city>"""
         if not WEATHER_API_KEY:
@@ -167,7 +167,7 @@ class UtilityCog(commands.Cog, name="Utility"):
         for i in range(len(options)):
             await message.add_reaction(emojis[i])
 
-    @commands.command()
+    @commands.hybrid_command()
     async def remind(self, ctx: commands.Context, time_str: str, *, reminder: str):
         """Set a reminder. Usage: !remind 1h30m <reminder>"""
         try:
@@ -194,7 +194,7 @@ class UtilityCog(commands.Cog, name="Utility"):
         except Exception as e:
             await ctx.send(f"âŒ Failed to set reminder: {e}")
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.has_permissions(manage_channels=True)
     async def vc247(self, ctx: commands.Context):
         """Make the bot stay in VC 24/7. Usage: !vc247"""
@@ -220,7 +220,7 @@ class UtilityCog(commands.Cog, name="Utility"):
         self.bot.loop.create_task(maintain())
         await ctx.send("ðŸ”Š Bot will stay in VC 24/7. Use `!leave` to stop.")
 
-    @commands.command()
+    @commands.hybrid_command()
     async def avatar(self, ctx: commands.Context, member: discord.Member = None):
         """Get a user's avatar. Usage: !avatar [@user]"""
         target = member or ctx.author
@@ -228,7 +228,7 @@ class UtilityCog(commands.Cog, name="Utility"):
         embed.set_image(url=target.display_avatar.url)
         await ctx.send(embed=embed)
 
-    @commands.command()
+    @commands.hybrid_command()
     async def serverinfo(self, ctx: commands.Context):
         """Get server information. Usage: !serverinfo"""
         g = ctx.guild
@@ -243,7 +243,7 @@ class UtilityCog(commands.Cog, name="Utility"):
         embed.add_field(name="Boosts", value=g.premium_subscription_count, inline=True)
         await ctx.send(embed=embed)
 
-    @commands.command()
+    @commands.hybrid_command()
     async def userinfo(self, ctx: commands.Context, member: discord.Member = None):
         """Get user information. Usage: !userinfo [@user]"""
         target = member or ctx.author
@@ -261,7 +261,7 @@ class UtilityCog(commands.Cog, name="Utility"):
         )
         await ctx.message.delete()
         
-    @commands.command(aliases=["binfo", "stats"])
+    @commands.hybrid_command(aliases=["binfo", "stats"])
     async def botinfo(self, ctx: commands.Context):
         """Show detailed statistics about the bot."""
         process = psutil.Process()
@@ -291,7 +291,7 @@ class UtilityCog(commands.Cog, name="Utility"):
         embed.set_footer(text=f"Requested by {ctx.author}", icon_url=ctx.author.display_avatar.url)
         await ctx.send(embed=embed)
 
-    @commands.command(aliases=["rinfo"])
+    @commands.hybrid_command(aliases=["rinfo"])
     async def roleinfo(self, ctx: commands.Context, *, role: discord.Role):
         """Show detailed information about a role."""
         embed = discord.Embed(

@@ -92,7 +92,7 @@ class GiveawayCog(commands.Cog, name="Giveaway"):
             await msg.edit(embed=embed)
             await channel.send(f"Congratulations {winner_mentions}! You won **{prize}**!\n{msg.jump_url}")
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.has_permissions(manage_messages=True)
     async def gstart(self, ctx: commands.Context, duration: str, winners: str, *, prize: str):
         """Start a giveaway. Usage: !gstart 10m 1w Prize"""
@@ -132,7 +132,7 @@ class GiveawayCog(commands.Cog, name="Giveaway"):
         }
         save_giveaway_data(data)
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.has_permissions(manage_messages=True)
     async def gend(self, ctx: commands.Context, message_id: int):
         """End a giveaway early. Usage: !gend <message_id>"""
@@ -150,7 +150,7 @@ class GiveawayCog(commands.Cog, name="Giveaway"):
         
         await ctx.send("✅ Giveaway ended early!")
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.has_permissions(manage_messages=True)
     async def greroll(self, ctx: commands.Context, message_id: int):
         """Reroll a giveaway winner. Usage: !greroll <message_id>"""

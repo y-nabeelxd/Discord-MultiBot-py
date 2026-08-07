@@ -243,7 +243,7 @@ class MusicCog(commands.Cog, name="Music"):
 
     # ── Commands ──────────────────────────────────────────────────────────────
 
-    @commands.command(aliases=["p"])
+    @commands.hybrid_command(aliases=["p"])
     async def play(self, ctx: commands.Context, *, query: str):
         """Play a song or add to queue. Usage: !play <song name or URL>"""
         vc = await self._ensure_voice(ctx)
@@ -291,7 +291,7 @@ class MusicCog(commands.Cog, name="Music"):
         view = SongSelectView(results, ctx)
         view.message = await ctx.send(embed=embed, view=view)
 
-    @commands.command()
+    @commands.hybrid_command()
     async def skip(self, ctx: commands.Context):
         """Skip the current song. Usage: !skip"""
         vc = ctx.voice_client
@@ -301,7 +301,7 @@ class MusicCog(commands.Cog, name="Music"):
         else:
             await ctx.send("❌ Nothing is playing to skip!")
 
-    @commands.command()
+    @commands.hybrid_command()
     async def queue(self, ctx: commands.Context):
         """Show the current song queue. Usage: !queue"""
         guild_id = ctx.guild.id
@@ -317,13 +317,13 @@ class MusicCog(commands.Cog, name="Music"):
         else:
             await ctx.send("📭 The queue is empty.")
 
-    @commands.command()
+    @commands.hybrid_command()
     async def clearqueue(self, ctx: commands.Context):
         """Clear the song queue. Usage: !clearqueue"""
         song_queues[ctx.guild.id] = []
         await ctx.send("🗑 Queue cleared!")
 
-    @commands.command()
+    @commands.hybrid_command()
     async def pause(self, ctx: commands.Context):
         """Pause playback. Usage: !pause"""
         vc = ctx.voice_client
@@ -333,7 +333,7 @@ class MusicCog(commands.Cog, name="Music"):
         else:
             await ctx.send("❌ Nothing is playing!")
 
-    @commands.command()
+    @commands.hybrid_command()
     async def resume(self, ctx: commands.Context):
         """Resume playback. Usage: !resume"""
         vc = ctx.voice_client
@@ -343,7 +343,7 @@ class MusicCog(commands.Cog, name="Music"):
         else:
             await ctx.send("❌ Playback is not paused!")
 
-    @commands.command()
+    @commands.hybrid_command()
     async def stop(self, ctx: commands.Context):
         """Stop playback and clear queue. Usage: !stop"""
         vc = ctx.voice_client
@@ -361,7 +361,7 @@ class MusicCog(commands.Cog, name="Music"):
         else:
             await ctx.send("❌ I'm not in a voice channel!")
 
-    @commands.command()
+    @commands.hybrid_command()
     async def leave(self, ctx: commands.Context):
         """Make the bot leave the voice channel. Usage: !leave"""
         vc = ctx.voice_client
@@ -424,7 +424,7 @@ class MusicCog(commands.Cog, name="Music"):
 
 
 
-    @commands.command()
+    @commands.hybrid_command()
     async def lyrics(self, ctx: commands.Context, *, query: str = None):
         """Get lyrics for a song. If no query provided, gets lyrics for current song."""
         if not query:

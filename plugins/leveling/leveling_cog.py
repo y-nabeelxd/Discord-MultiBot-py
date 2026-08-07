@@ -68,7 +68,7 @@ class LevelingCog(commands.Cog, name="Leveling"):
             except discord.Forbidden:
                 pass
 
-    @commands.command(aliases=["level"])
+    @commands.hybrid_command(aliases=["level"])
     async def rank(self, ctx: commands.Context, member: discord.Member = None):
         """Check your rank and XP. Usage: !rank [@user]"""
         target = member or ctx.author
@@ -104,7 +104,7 @@ class LevelingCog(commands.Cog, name="Leveling"):
 
         await ctx.send(embed=embed)
 
-    @commands.command(aliases=["lb", "top"])
+    @commands.hybrid_command(aliases=["lb", "top"])
     async def leaderboard(self, ctx: commands.Context):
         """Show the top 10 members in the server by XP. Usage: !leaderboard"""
         if not self.data:

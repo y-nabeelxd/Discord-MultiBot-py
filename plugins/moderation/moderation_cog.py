@@ -18,7 +18,7 @@ class ModerationCog(commands.Cog, name="Moderation"):
 
     # ── Ban / Kick ────────────────────────────────────────────────────────────
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.has_permissions(ban_members=True)
     async def ban(self, ctx: commands.Context, member: discord.Member, *, reason: str = "No reason provided"):
         """Ban a member. Usage: !ban @user [reason]"""
@@ -35,7 +35,7 @@ class ModerationCog(commands.Cog, name="Moderation"):
         except Exception as e:
             await ctx.send(f"❌ Failed to ban member: {e}")
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.has_permissions(kick_members=True)
     async def kick(self, ctx: commands.Context, member: discord.Member, *, reason: str = "No reason provided"):
         """Kick a member. Usage: !kick @user [reason]"""
@@ -54,7 +54,7 @@ class ModerationCog(commands.Cog, name="Moderation"):
 
     # ── Timeout ───────────────────────────────────────────────────────────────
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.has_permissions(moderate_members=True)
     async def timeout(self, ctx: commands.Context, member: discord.Member, duration: str, *, reason: str = "No reason provided"):
         """Timeout a member (1s/1m/1h/1d). Usage: !timeout @user 30m [reason]"""
@@ -79,7 +79,7 @@ class ModerationCog(commands.Cog, name="Moderation"):
 
     # ── Slowmode ──────────────────────────────────────────────────────────────
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.has_permissions(manage_channels=True)
     async def slowmode(self, ctx: commands.Context, duration: str):
         """Set channel slowmode. Usage: !slowmode 30s"""
@@ -96,7 +96,7 @@ class ModerationCog(commands.Cog, name="Moderation"):
         except Exception as e:
             await ctx.send(f"❌ Failed to set slowmode: {e}")
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.has_permissions(manage_channels=True)
     async def slowoff(self, ctx: commands.Context, channel: discord.TextChannel = None):
         """Remove slowmode from a channel. Usage: !slowoff [#channel]"""
@@ -109,7 +109,7 @@ class ModerationCog(commands.Cog, name="Moderation"):
 
     # ── Nickname ──────────────────────────────────────────────────────────────
 
-    @commands.command(aliases=["nick"])
+    @commands.hybrid_command(aliases=["nick"])
     @commands.has_permissions(manage_nicknames=True)
     async def setnick(self, ctx: commands.Context, member: discord.Member, *, nickname: str):
         """Set a member's nickname. Usage: !setnick @user NewNickname"""
@@ -127,7 +127,7 @@ class ModerationCog(commands.Cog, name="Moderation"):
         except Exception as e:
             await ctx.send(f"❌ Failed: {e}")
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.has_permissions(manage_nicknames=True)
     async def resetnick(self, ctx: commands.Context, member: discord.Member):
         """Reset a member's nickname. Usage: !resetnick @user"""
@@ -146,7 +146,7 @@ class ModerationCog(commands.Cog, name="Moderation"):
 
     # ── Roles ─────────────────────────────────────────────────────────────────
 
-    @commands.command()
+    @commands.hybrid_command()
     async def getroles(self, ctx: commands.Context, member: discord.Member = None):
         """Get a member's roles. Usage: !getroles [@user]"""
         target = member or ctx.author
@@ -158,7 +158,7 @@ class ModerationCog(commands.Cog, name="Moderation"):
         )
         await ctx.send(embed=embed)
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.has_permissions(manage_roles=True)
     async def addrole(self, ctx: commands.Context, member: discord.Member, *, role: discord.Role):
         """Add a role to a member. Usage: !addrole @user @Role"""
@@ -175,7 +175,7 @@ class ModerationCog(commands.Cog, name="Moderation"):
         except Exception as e:
             await ctx.send(f"❌ Failed: {e}")
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.has_permissions(manage_roles=True)
     async def removerole(self, ctx: commands.Context, member: discord.Member, *, role: discord.Role):
         """Remove a role from a member. Usage: !removerole @user @Role"""
@@ -192,7 +192,7 @@ class ModerationCog(commands.Cog, name="Moderation"):
         except Exception as e:
             await ctx.send(f"❌ Failed: {e}")
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.has_permissions(manage_roles=True)
     async def createrole(self, ctx: commands.Context, name: str, color: str = None, *, reason: str = None):
         """Create a new role. Usage: !createrole <name> [hex color] [reason]"""
@@ -215,7 +215,7 @@ class ModerationCog(commands.Cog, name="Moderation"):
         except Exception as e:
             await ctx.send(f"❌ Failed: {e}")
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.has_permissions(manage_roles=True)
     async def deleterole(self, ctx: commands.Context, *, role: discord.Role):
         """Delete a role. Usage: !deleterole @role"""
@@ -228,7 +228,7 @@ class ModerationCog(commands.Cog, name="Moderation"):
 
     # ── Lock / Unlock ─────────────────────────────────────────────────────────
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.has_permissions(manage_channels=True)
     async def lock(self, ctx: commands.Context, channel: discord.TextChannel = None, role: discord.Role = None):
         """Lock a channel. Usage: !lock [#channel] [@role]"""
@@ -255,7 +255,7 @@ class ModerationCog(commands.Cog, name="Moderation"):
         except Exception as e:
             await ctx.send(f"❌ Error: {e}")
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.has_permissions(manage_channels=True)
     async def unlock(self, ctx: commands.Context, channel: discord.TextChannel = None, role: discord.Role = None):
         """Unlock a channel. Usage: !unlock [#channel] [@role]"""
@@ -284,7 +284,7 @@ class ModerationCog(commands.Cog, name="Moderation"):
 
     # ── Warn system ───────────────────────────────────────────────────────────
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.has_permissions(manage_messages=True)
     async def warn(self, ctx: commands.Context, member: discord.Member, *, reason: str = "No reason provided"):
         """Warn a member. Usage: !warn @user [reason]"""
@@ -316,7 +316,7 @@ class ModerationCog(commands.Cog, name="Moderation"):
         except discord.Forbidden:
             pass
 
-    @commands.command()
+    @commands.hybrid_command()
     async def warnings(self, ctx: commands.Context, member: discord.Member = None):
         """Check a member's warnings. Usage: !warnings [@user]"""
         target = member or ctx.author
@@ -341,7 +341,7 @@ class ModerationCog(commands.Cog, name="Moderation"):
             )
         await ctx.send(embed=embed)
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.has_permissions(manage_messages=True)
     async def clearwarns(self, ctx: commands.Context, member: discord.Member):
         """Clear all warnings for a member. Usage: !clearwarns @user"""
@@ -360,7 +360,7 @@ class ModerationCog(commands.Cog, name="Moderation"):
 
     # ── Purge / Nuke / Clone ──────────────────────────────────────────────────
 
-    @commands.command(aliases=["clear"])
+    @commands.hybrid_command(aliases=["clear"])
     @commands.has_permissions(manage_messages=True)
     async def purge(self, ctx: commands.Context, amount: int = 10):
         """Delete messages from the channel (max 100). Usage: !purge [amount]"""
@@ -374,7 +374,7 @@ class ModerationCog(commands.Cog, name="Moderation"):
         )
         await ctx.send(embed=embed, delete_after=5)
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.has_permissions(manage_channels=True)
     async def nuke(self, ctx: commands.Context, channel: discord.TextChannel = None):
         """Clone and delete a channel to remove all messages. Usage: !nuke [#channel]"""
@@ -405,7 +405,7 @@ class ModerationCog(commands.Cog, name="Moderation"):
         except Exception as e:
             await ctx.send(f"❌ Failed: {e}")
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.has_permissions(manage_channels=True)
     async def clone(self, ctx: commands.Context, channel: discord.TextChannel = None):
         """Clone a channel. Usage: !clone [#channel]"""
@@ -418,7 +418,7 @@ class ModerationCog(commands.Cog, name="Moderation"):
 
     # ── Mute / Unmute ─────────────────────────────────────────────────────────
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.has_permissions(manage_messages=True)
     async def mute(self, ctx: commands.Context, member: discord.Member, *, reason: str = "No reason provided"):
         """Mute a member (creates Muted role if needed). Usage: !mute @user [reason]"""
@@ -445,7 +445,7 @@ class ModerationCog(commands.Cog, name="Moderation"):
         except Exception as e:
             await ctx.send(f"❌ Failed: {e}")
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.has_permissions(manage_messages=True)
     async def unmute(self, ctx: commands.Context, member: discord.Member):
         """Unmute a member. Usage: !unmute @user"""

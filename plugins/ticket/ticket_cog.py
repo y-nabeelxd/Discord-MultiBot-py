@@ -90,7 +90,7 @@ class TicketCog(commands.Cog, name="Ticket"):
         self.bot.add_view(TicketPanelView())
         self.bot.add_view(TicketControlView())
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.has_permissions(administrator=True)
     @commands.cooldown(1, 10, commands.BucketType.guild)
     async def ticket(self, ctx: commands.Context, action: str = None):

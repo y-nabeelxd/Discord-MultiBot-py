@@ -125,7 +125,7 @@ class FunCog(commands.Cog, name="Fun"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @commands.command(aliases=["rockpaperscissors"])
+    @commands.hybrid_command(aliases=["rockpaperscissors"])
     async def rps(self, ctx: commands.Context, choice: str):
         """Play Rock Paper Scissors. Usage: !rps rock|paper|scissors"""
         choices = ["rock", "paper", "scissors"]
@@ -152,7 +152,7 @@ class FunCog(commands.Cog, name="Fun"):
         embed.add_field(name="Result", value=result, inline=False)
         await ctx.send(embed=embed)
 
-    @commands.command(aliases=["dice"])
+    @commands.hybrid_command(aliases=["dice"])
     async def roll(self, ctx: commands.Context, dice: str = "1d6"):
         """Roll dice in NdN format. Usage: !roll 2d20"""
         try:
@@ -176,7 +176,7 @@ class FunCog(commands.Cog, name="Fun"):
                 embed.set_footer(text="Critical fail! 💀")
         await ctx.send(embed=embed)
 
-    @commands.command(aliases=["flip"])
+    @commands.hybrid_command(aliases=["flip"])
     async def flipcoin(self, ctx: commands.Context):
         """Flip a coin. Usage: !flipcoin"""
         result = random.choice(["Heads", "Tails"])
@@ -187,7 +187,7 @@ class FunCog(commands.Cog, name="Fun"):
         )
         await ctx.send(embed=embed)
 
-    @commands.command()
+    @commands.hybrid_command()
     async def guess(self, ctx: commands.Context, number: int):
         """Guess a number between 1 and 10. Usage: !guess 5"""
         if not 1 <= number <= 10:
@@ -202,7 +202,7 @@ class FunCog(commands.Cog, name="Fun"):
         embed = discord.Embed(title="🔢 Number Guessing Game", description=msg, color=color)
         await ctx.send(embed=embed)
 
-    @commands.command()
+    @commands.hybrid_command()
     async def slap(self, ctx: commands.Context, member: discord.Member):
         """Slap someone! Usage: !slap @user"""
         reactions = ["(╯°□°）╯︵ ┻━┻", "⊙﹏⊙", "(ﾉ`Д´)ﾉ", "ಠ_ಠ", "(•̀o•́)ง"]
@@ -211,7 +211,7 @@ class FunCog(commands.Cog, name="Fun"):
         embed.set_image(url="https://c.tenor.com/XiYuU9h44-AAAAAC/tenor.gif")
         await ctx.send(embed=embed)
 
-    @commands.command()
+    @commands.hybrid_command()
     async def kiss(self, ctx: commands.Context, member: discord.Member):
         """Kiss someone! Usage: !kiss @user"""
         reactions = ["(づ￣ ³￣)づ", "(*˘︶˘*).｡.:*♡", "(っ˘ω˘ς )", "♡(˃͈ દ ˂͈ ༶ )", "(´∀｀)♡"]
@@ -220,7 +220,7 @@ class FunCog(commands.Cog, name="Fun"):
         embed.set_image(url="https://www.icegif.com/wp-content/uploads/2022/08/icegif-1235.gif")
         await ctx.send(embed=embed)
 
-    @commands.command()
+    @commands.hybrid_command()
     async def hug(self, ctx: commands.Context, member: discord.Member):
         """Hug someone! Usage: !hug @user"""
         reactions = ["(⊃｡•́‿•̀｡)⊃", "(っ´▽｀)っ", "⊂((・▽・))⊃", "(つ≧▽≦)つ", "╰(*´︶`*)╯"]
@@ -229,7 +229,7 @@ class FunCog(commands.Cog, name="Fun"):
         embed.set_image(url="https://usagif.com/wp-content/uploads/gif/anime-hug-59.gif")
         await ctx.send(embed=embed)
 
-    @commands.command(name="8ball")
+    @commands.hybrid_command(name="8ball")
     async def eight_ball(self, ctx: commands.Context, *, question: str):
         """Ask the magic 8-ball a question. Usage: !8ball <question>"""
         responses = [
@@ -246,7 +246,7 @@ class FunCog(commands.Cog, name="Fun"):
         embed.add_field(name="Answer", value=random.choice(responses), inline=False)
         await ctx.send(embed=embed)
 
-    @commands.command()
+    @commands.hybrid_command()
     async def tictactoe(self, ctx: commands.Context, member: discord.Member):
         """Play Tic-Tac-Toe with someone. Usage: !tictactoe @user"""
         if member == ctx.author or member.bot:
@@ -255,7 +255,7 @@ class FunCog(commands.Cog, name="Fun"):
         view = TicTacToe(ctx.author, member)
         await ctx.send(f"Tic-Tac-Toe: **{ctx.author.display_name}** vs **{member.display_name}**\nIt is **{ctx.author.display_name}**'s turn (X)!", view=view)
 
-    @commands.command()
+    @commands.hybrid_command()
     async def trivia(self, ctx: commands.Context):
         """Play a game of trivia. Usage: !trivia"""
         async with aiohttp.ClientSession() as session:
@@ -287,7 +287,7 @@ class FunCog(commands.Cog, name="Fun"):
 
 
 
-    @commands.command()
+    @commands.hybrid_command()
     async def meme(self, ctx: commands.Context):
         """Get a random meme from Reddit."""
         msg = await ctx.send("Fetching a fresh meme...")
@@ -305,7 +305,7 @@ class FunCog(commands.Cog, name="Fun"):
         except Exception:
             await msg.edit(content="❌ An error occurred while fetching the meme.")
 
-    @commands.command()
+    @commands.hybrid_command()
     async def ship(self, ctx: commands.Context, user1: discord.Member, user2: discord.Member = None):
         """Calculate the love compatibility between two users."""
         if not user2:
@@ -346,7 +346,7 @@ class FunCog(commands.Cog, name="Fun"):
         )
         await ctx.send(embed=embed)
 
-    @commands.command(aliases=["ms"])
+    @commands.hybrid_command(aliases=["ms"])
     async def minesweeper(self, ctx: commands.Context):
         """Play a game of minesweeper."""
         columns = 9

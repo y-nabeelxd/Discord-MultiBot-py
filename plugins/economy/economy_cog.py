@@ -22,7 +22,7 @@ class EconomyCog(commands.Cog, name="Economy"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @commands.command(name=f"{GAME_PREFIX}coinflip", aliases=[f"{GAME_PREFIX}cf"])
+    @commands.hybrid_command(name=f"{GAME_PREFIX}coinflip", aliases=[f"{GAME_PREFIX}cf"])
     async def coinflip(self, ctx: commands.Context, amount: int, choice: str = None):
         """Flip a coin with coins. Usage: owo coinflip <amount> [heads/tails]"""
         if amount <= 0:
@@ -85,7 +85,7 @@ class EconomyCog(commands.Cog, name="Economy"):
         result_embed.add_field(name="New Balance", value=f"{data[uid]['balance']} coins", inline=False)
         await msg.edit(embed=result_embed)
 
-    @commands.command(name=f"{GAME_PREFIX}slots", aliases=[f"{GAME_PREFIX}s"])
+    @commands.hybrid_command(name=f"{GAME_PREFIX}slots", aliases=[f"{GAME_PREFIX}s"])
     async def slots(self, ctx: commands.Context, amount: int):
         """Play slots. Usage: owo slots <amount>"""
         if amount <= 0:
@@ -153,7 +153,7 @@ class EconomyCog(commands.Cog, name="Economy"):
         res_embed.add_field(name="New Balance", value=f"{data[uid]['balance']} coins", inline=False)
         await msg.edit(embed=res_embed)
 
-    @commands.command(name=f"{GAME_PREFIX}daily")
+    @commands.hybrid_command(name=f"{GAME_PREFIX}daily")
     async def daily(self, ctx: commands.Context):
         """Claim daily coins (300–5000). Usage: owo daily"""
         data = get_owo_data()
@@ -182,7 +182,7 @@ class EconomyCog(commands.Cog, name="Economy"):
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name=f"{GAME_PREFIX}balance", aliases=[f"{GAME_PREFIX}bal"])
+    @commands.hybrid_command(name=f"{GAME_PREFIX}balance", aliases=[f"{GAME_PREFIX}bal"])
     async def balance(self, ctx: commands.Context, member: discord.Member = None):
         """Check coin balance. Usage: owo balance [@user]"""
         target = member or ctx.author
@@ -196,7 +196,7 @@ class EconomyCog(commands.Cog, name="Economy"):
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name=f"{GAME_PREFIX}addcoin")
+    @commands.hybrid_command(name=f"{GAME_PREFIX}addcoin")
     async def addcoin(self, ctx: commands.Context, member: discord.Member, amount: int):
         """Add coins to a user (Bot owner only). Usage: owo addcoin @user <amount>"""
         if BOT_OWNER and ctx.author.id != BOT_OWNER:
@@ -219,7 +219,7 @@ class EconomyCog(commands.Cog, name="Economy"):
 
 
 
-    @commands.command(name=f"{GAME_PREFIX}work")
+    @commands.hybrid_command(name=f"{GAME_PREFIX}work")
     async def work(self, ctx: commands.Context):
         """Work to earn coins. Usage: owo work"""
         data = get_owo_data()
@@ -257,7 +257,7 @@ class EconomyCog(commands.Cog, name="Economy"):
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name=f"{GAME_PREFIX}pay", aliases=[f"{GAME_PREFIX}give"])
+    @commands.hybrid_command(name=f"{GAME_PREFIX}pay", aliases=[f"{GAME_PREFIX}give"])
     async def pay(self, ctx: commands.Context, member: discord.Member, amount: int):
         """Pay someone coins. Usage: owo pay @user <amount>"""
         if amount <= 0:
@@ -288,7 +288,7 @@ class EconomyCog(commands.Cog, name="Economy"):
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name=f"{GAME_PREFIX}rob", aliases=[f"{GAME_PREFIX}steal"])
+    @commands.hybrid_command(name=f"{GAME_PREFIX}rob", aliases=[f"{GAME_PREFIX}steal"])
     async def rob(self, ctx: commands.Context, member: discord.Member):
         """Attempt to rob someone. Usage: owo rob @user"""
         if member.id == ctx.author.id:
