@@ -1,5 +1,5 @@
 discord.py[voice]>=2.4.0
-quickjs>=1.19.4
+static-ffmpeg>=2.5
 yt-dlp>=2024.1.1
 requests==2.31.0
 aiohttp>=3.9.1

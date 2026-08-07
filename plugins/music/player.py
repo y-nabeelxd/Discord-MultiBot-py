@@ -16,6 +16,14 @@ import urllib.parse
 from utils import format_duration
 from config import YT_API_KEY
 
+# ── Ensure ffmpeg is available (static binary via pip, works on any Linux server) ──
+try:
+    import static_ffmpeg
+    static_ffmpeg.add_paths()  # adds ffmpeg/ffprobe to PATH automatically
+    print("[Music] static-ffmpeg paths added successfully.")
+except ImportError:
+    pass  # If not installed, rely on system ffmpeg
+
 # ── yt-dlp options ────────────────────────────────────────────────────────────
 # IMPORTANT: Do NOT set extract_flat=True — that prevents stream URL extraction
 YTDL_FORMAT_OPTIONS = {
