@@ -213,11 +213,14 @@ async def _play_song(ctx: commands.Context, url: str, title: str):
             print(f"[Music] Player error: {error}")
         asyncio.run_coroutine_threadsafe(_play_next(ctx), ctx.bot.loop)
 
+    # Stop anything currently playing before starting new audio (prevents race condition)
+    if vc.is_playing() or vc.is_paused():
+        vc.stop()
+        await asyncio.sleep(0.3)
     try:
         vc.play(source, after=after_playing)
-    except discord.ClientException:
-        # Already playing audio
-        print(f"[Music] ClientException: Already playing audio in {guild_id}")
+    except discord.ClientException as e:
+        print(f"[Music] ClientException: {e}")
 
 
 # ── Cog ───────────────────────────────────────────────────────────────────────
@@ -238,22 +241,38 @@ class MusicCog(commands.Cog, name="Music"):
             if vc.channel != ctx.author.voice.channel:
                 await vc.move_to(ctx.author.voice.channel)
         else:
+            # Force-disconnect any ghost/dead voice session first
             if ctx.guild.voice_client:
                 try:
                     await ctx.guild.voice_client.disconnect(force=True)
+                    await asyncio.sleep(0.5)
                 except Exception:
                     pass
+            # reconnect=False prevents discord.py from internally looping 5 times on 4017.
+            # We handle the retry ourselves with a short delay below.
             try:
-                vc = await ctx.author.voice.channel.connect(timeout=20.0, reconnect=True)
-            except Exception as e:
-                print(f"[Music] Connection attempt 1 failed: {e}")
-                await asyncio.sleep(1)
+                vc = await ctx.author.voice.channel.connect(timeout=15.0, reconnect=False)
+            except discord.errors.ConnectionClosed as e:
+                # 4017 = Discord's regional voice server rejected the WS handshake.
+                # Wait briefly and try once more.
+                print(f"[Music] Voice connection failed (code {e.code}), retrying once...")
+                await asyncio.sleep(2)
                 try:
-                    vc = await ctx.author.voice.channel.connect(timeout=20.0, reconnect=True)
+                    vc = await ctx.author.voice.channel.connect(timeout=15.0, reconnect=False)
                 except Exception as e2:
-                    print(f"[Music] Connection attempt 2 failed: {e2}")
-                    await ctx.send("❌ **Discord Voice Server Error (4017)**: Discord's voice servers are currently rejecting the connection for this region.\n\n💡 **Fix:** Edit this Voice Channel's settings and change the **Region Override** (e.g., from Automatic to Singapore or Europe), then try again!")
+                    print(f"[Music] Voice connection permanently failed: {e2}")
+                    await ctx.send(
+                        "❌ **Discord Voice Server Error (4017)**\n"
+                        "Discord's voice servers for your region are rejecting the connection.\n\n"
+                        "💡 **To fix this:** Right-click your Voice Channel → **Edit Channel** → "
+                        "set **Region Override** to **Singapore**, **US East**, or **Europe** — "
+                        "then try `/play` again!"
+                    )
                     return None
+            except Exception as e:
+                print(f"[Music] Unexpected voice connection error: {e}")
+                await ctx.send(f"❌ Failed to join voice channel: `{e}`")
+                return None
         return vc
 
     # ── Commands ──────────────────────────────────────────────────────────────
