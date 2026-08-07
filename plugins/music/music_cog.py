@@ -243,8 +243,10 @@ class MusicCog(commands.Cog, name="Music"):
                 await vc.move_to(ctx.author.voice.channel)
             return vc
 
-        # Helper: forcefully nuke any ghost/stale voice session
-        async def _cleanup_voice():
+        # Nuke ALL voice state — disconnect, cleanup, and wipe discord.py's
+        # internal registry so the next connect() sends a fresh IDENTIFY,
+        # not a stale RESUME that triggers 4006.
+        async def _deep_cleanup():
             existing = ctx.guild.voice_client
             if existing:
                 try:
@@ -255,33 +257,39 @@ class MusicCog(commands.Cog, name="Music"):
                     await existing.disconnect(force=True)
                 except Exception:
                     pass
-                await asyncio.sleep(1.0)
+            # Also clear discord.py's internal voice_clients dict for this guild
+            try:
+                ctx.bot._connection._voice_clients.pop(ctx.guild.id, None)
+            except Exception:
+                pass
+            await asyncio.sleep(3.0)  # Wait for Discord's server to expire the old session
 
-        await _cleanup_voice()
+        await _deep_cleanup()
 
-        # Attempt 1
+        # Attempt 1 — fresh session
         try:
-            vc = await ctx.author.voice.channel.connect(timeout=15.0, reconnect=False)
+            vc = await ctx.author.voice.channel.connect(timeout=20.0, reconnect=False)
             return vc
         except (discord.errors.ConnectionClosed, discord.ClientException) as e:
             code = getattr(e, 'code', 'N/A')
             print(f"[Music] Voice connection attempt 1 failed (code {code}): {e}")
 
-        # Clean up again — 4006/stale sessions leave a ghost vc behind
-        await _cleanup_voice()
-        await asyncio.sleep(1.0)
+        # Full cleanup again before attempt 2
+        await _deep_cleanup()
 
         # Attempt 2
         try:
-            vc = await ctx.author.voice.channel.connect(timeout=15.0, reconnect=False)
+            vc = await ctx.author.voice.channel.connect(timeout=20.0, reconnect=False)
             return vc
         except Exception as e2:
             print(f"[Music] Voice connection attempt 2 failed: {e2}")
             await ctx.send(
                 "❌ **Could not connect to voice channel.**\n"
-                "Discord's voice server rejected the connection twice.\n\n"
-                "💡 Try: **kick the bot** from voice (if it appears stuck), then use `/play` again.\n"
-                "If this keeps happening, change the Voice Channel's **Region Override** to **Rotterdam**."
+                "Discord's voice servers are repeatedly rejecting the connection.\n\n"
+                "💡 **Try these in order:**\n"
+                "1. Use `!stop` or kick the bot from voice if it appears stuck\n"
+                "2. Wait 10 seconds, then try `/play` again\n"
+                "3. If still failing, Discord's voice servers may be having an outage — check https://discordstatus.com"
             )
             return None
 
