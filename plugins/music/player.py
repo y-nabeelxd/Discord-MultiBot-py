@@ -115,9 +115,29 @@ class YTDLSource(discord.PCMVolumeTransformer):
                 url = api_results[0]["url"]
 
         # Run blocking yt-dlp call in executor to avoid blocking the event loop
-        data = await loop.run_in_executor(
-            None, lambda: ytdl.extract_info(url, download=not stream)
-        )
+        try:
+            data = await loop.run_in_executor(
+                None, lambda: ytdl.extract_info(url, download=not stream)
+            )
+        except Exception as e:
+            print(f"[Music] yt-dlp error: {e}. Falling back to SoundCloud...")
+            title_to_search = url
+            if "youtube.com" in url or "youtu.be" in url:
+                try:
+                    fallback_opts = {**YTDL_FORMAT_OPTIONS, "extract_flat": True}
+                    ydl_fallback = yt_dlp.YoutubeDL(fallback_opts)
+                    flat_data = await loop.run_in_executor(None, lambda: ydl_fallback.extract_info(url, download=False))
+                    if flat_data and "title" in flat_data:
+                        title_to_search = flat_data["title"]
+                except Exception as inner_e:
+                    print(f"[Music] Could not extract title for fallback: {inner_e}")
+                    raise ValueError(f"Failed to play and could not extract title for fallback: {e}")
+            
+            sc_url = f"scsearch1:{title_to_search}"
+            data = await loop.run_in_executor(
+                None, lambda: ytdl.extract_info(sc_url, download=not stream)
+            )
+
         if not data:
             raise ValueError("yt-dlp returned no data for that query.")
         # If it's a playlist/search result, take the first entry
