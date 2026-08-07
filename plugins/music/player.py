@@ -121,18 +121,21 @@ class YTDLSource(discord.PCMVolumeTransformer):
             )
         except Exception as e:
             print(f"[Music] yt-dlp error: {e}. Falling back to SoundCloud...")
-            title_to_search = url
+            # Get the video title via YouTube's public oEmbed API (no auth, never bot-blocked)
+            title_to_search = url  # default fallback
             if "youtube.com" in url or "youtu.be" in url:
                 try:
-                    fallback_opts = {**YTDL_FORMAT_OPTIONS, "extract_flat": True}
-                    ydl_fallback = yt_dlp.YoutubeDL(fallback_opts)
-                    flat_data = await loop.run_in_executor(None, lambda: ydl_fallback.extract_info(url, download=False))
-                    if flat_data and "title" in flat_data:
-                        title_to_search = flat_data["title"]
-                except Exception as inner_e:
-                    print(f"[Music] Could not extract title for fallback: {inner_e}")
-                    raise ValueError(f"Failed to play and could not extract title for fallback: {e}")
-            
+                    import re, urllib.request, json as _json
+                    vid_match = re.search(r"(?:v=|youtu\.be/)([a-zA-Z0-9_-]{11})", url)
+                    if vid_match:
+                        vid_id = vid_match.group(1)
+                        oembed_url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={vid_id}&format=json"
+                        with urllib.request.urlopen(oembed_url, timeout=5) as r:
+                            title_to_search = _json.loads(r.read())["title"]
+                            print(f"[Music] Got title via oEmbed: {title_to_search!r}")
+                except Exception as title_err:
+                    print(f"[Music] oEmbed title fetch failed: {title_err}. Using raw URL as query.")
+
             sc_url = f"scsearch1:{title_to_search}"
             data = await loop.run_in_executor(
                 None, lambda: ytdl.extract_info(sc_url, download=not stream)
