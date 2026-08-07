@@ -124,22 +124,12 @@ python bot.py
 
 ---
 
-## ⚡ Slash Commands
+## ⚡ Hybrid Commands (Slash + Prefix)
 
-> Most slash commands require **bot owner** or **server owner** permissions.
+> **Almost ALL commands in this bot are Hybrid Commands!**
+> This means any command you see below with a prefix (like `!play` or `owo slots`) can also be used as a slash command (like `/play` or `/slots`). The bot perfectly synchronizes both!
 
-### Moderation
-| Command | Description |
-|---------|-------------|
-| `/kick @user [reason]` | Kick a user |
-| `/ban @user [reason]` | Ban a user |
-| `/unban <username/id>` | Remove from ban list |
-| `/clear <amount>` | Bulk delete messages |
-| `/setnick <name> [@user]` | Change nickname |
-| `/role_give @user @role` | Give role to user |
-| `/role_remove @user @role` | Remove role from user |
-
-### Voice
+### Dedicated Voice Slash Commands (Owner Only)
 | Command | Description |
 |---------|-------------|
 | `/move_all [channel]` | Move all members to a voice channel |
