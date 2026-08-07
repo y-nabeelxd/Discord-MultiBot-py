@@ -1,186 +1,300 @@
-# Discord MultiBot (Python)
+<div align="center">
+
+# 🤖 Discord MultiBot
+
+**A modern, plugin-based multipurpose Discord bot — music, verification, moderation & more.**
+
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://python.org)
+[![discord.py](https://img.shields.io/badge/discord.py-2.3-5865F2?logo=discord&logoColor=white)](https://discordpy.readthedocs.io)
+[![License](https://img.shields.io/github/license/y-nabeelxd/Discord-MultiBot-py)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/y-nabeelxd/Discord-MultiBot-py?style=social)](https://github.com/y-nabeelxd/Discord-MultiBot-py)
 
 **Author:** [y-nabeelxd](https://github.com/y-nabeelxd)
 
-A **feature-rich Discord bot** made with **Python** and **discord.py**.
-
-This bot comes with **music playback**, **Roblox verification**, **FiveM verification**, **moderation tools**, and **fun commands**.
-> ⚠️ *Valorant and SA:MP verifications are under maintenance (fix coming soon).*
+</div>
 
 ---
 
 ## ✨ Features
-- **🎵 Music Player** — Play songs from YouTube (no cookies, API keys, or tokens needed)
-- **🛡️ Moderation Tools** — Ban, kick, timeout, slowmode, set nicknames, and manage roles
-- **🔒 Verification Systems** — Roblox and FiveM verification with role assignment
-- **🎮 Fun & Mini Games** — Rock-Paper-Scissors, Dice rolls, Coin flips, Guessing game
-- **📊 Owo Economy Games** — Slots, Coinflip, Daily rewards with coin system
-- **📆 Polls & Utilities** — Create polls, reminders, server info, and user info
-- **📌 FiveM Server Status** — Live server status updates with `!fivemserverlive`
-- **🔧 Slash Commands** — Modern `/command` interface for moderation and management alongside traditional prefix commands
-- **🚀 Future Plans** — More useful and better commands will be added soon!
+
+| Category | Highlights |
+|----------|-----------|
+| 🎵 **Music** | YouTube playback, queue, skip, pause, resume — fixed & stable |
+| 🛡️ **Moderation** | Ban, kick, timeout, lock, warn, mute, purge, nuke, roles |
+| 🔒 **Verification** | Roblox (code-in-bio) · FiveM (player lookup) · SA:MP · Valorant |
+| 🏆 **Leveling** | Passive XP system, user ranks, and server leaderboards |
+| 🎫 **Tickets** | Support panel with private threads and interactive buttons |
+| 🎉 **Giveaways** | Timed giveaways with interactive join buttons and auto-rollers |
+| 🎮 **Fun & Games** | RPS, dice, coin flip, 8-ball, Trivia, Tic-Tac-Toe, slap, kiss, hug |
+| 🪙 **Economy** | owo slots, coinflip, daily rewards, balance |
+| 🔧 **Utility** | Weather, translate, poll, remind, avatar, server/user info, snipe, afk |
+| ⚡ **Slash Commands** | Modern `/command` interface for moderation and voice management |
+| 🧩 **Plugin System** | Every command category lives in its own plugin file |
 
 ---
 
 ## 📂 Project Structure
+
 ```
 Discord-MultiBot-py/
-├── bot.py
-├── LICENCE
+├── bot.py                     # Entry point — loads all plugins
+├── config.py                  # All settings read from .env
+├── utils.py                   # Shared helpers & API calls
+├── .env                       # Your secrets (gitignored)
+├── .env.example               # Template — copy and fill in
 ├── requirements.txt
-└── README.md
+├── db/                        # Auto-created JSON data files
+└── plugins/
+    ├── music/
+    │   ├── player.py          # yt-dlp engine (fixed)
+    │   └── music_cog.py       # Music commands + button controls
+    ├── moderation/
+    │   └── moderation_cog.py  # All moderation commands
+    ├── verification/
+    │   └── verification_cog.py
+    ├── fun/
+    │   └── fun_cog.py
+    ├── economy/
+    │   └── economy_cog.py
+    ├── utility/
+    │   └── utility_cog.py
+    ├── leveling/
+    │   └── leveling_cog.py    # XP and Leveling system
+    ├── ticket/
+    │   └── ticket_cog.py      # Support Ticket system
+    ├── giveaway/
+    │   └── giveaway_cog.py    # Timed giveaway system
+    └── slash/
+        └── slash_cog.py       # All /slash commands
 ```
 
 ---
 
 ## ⚙️ Setup & Installation
-1. **Clone the repository:**
-```
+
+### 1. Clone the repository
+```bash
 git clone https://github.com/y-nabeelxd/Discord-MultiBot-py
 cd Discord-MultiBot-py
 ```
-2. **Install dependencies:**
-```
+
+### 2. Install dependencies
+```bash
 pip install -r requirements.txt
 ```
-3. **Edit bot configuration:**
-- **Bot Token:** 
-Open `bot.py` and replace:
-```
-TOKEN = os.getenv('DISCORD_TOKEN') or 'BOT_TOKEN'
-```
-with your bot token inside 'BOT_TOKEN' or set DISCORD_TOKEN as an environment variable.
-- **Prefix:**
-Change the command prefix:
-```
-PREFIX = "!"
-```
-(This is around line **41** in `bot.py`)
 
-4. **Run the bot:**
+> **Note:** FFmpeg must also be installed and on your PATH for music to work.
+> - Windows: [ffmpeg.org/download.html](https://ffmpeg.org/download.html)
+> - Linux: `sudo apt install ffmpeg`
+
+### 3. Configure your `.env` file
+```bash
+cp .env.example .env
 ```
+Then open `.env` and fill in your values:
+
+> [!WARNING]
+> **Privileged Intents Required**
+> You must enable all 3 Privileged Intents (**Presence**, **Server Members**, **Message Content**) in the [Discord Developer Portal](https://discord.com/developers/applications) for this bot to function correctly. If you do not, the bot will not respond to commands.
+
+```env
+DISCORD_TOKEN=your_bot_token_here
+PREFIX=!
+GAME_PREFIX=owo
+BOT_OWNER_ID=your_discord_user_id
+
+# Optional
+WEATHER_API_KEY=your_openweathermap_key
+
+# Enable verifications
+VERIFICATION_ROBLOX=true
+ROBLOX_ROLE_ID=123456789
+
+VERIFICATION_FIVEM=true
+FIVEM_SERVER=your_ip:port
+FIVEM_ROLE_ID=123456789
+```
+
+See [.env.example](.env.example) for all available options.
+
+### 4. Run the bot
+```bash
 python bot.py
 ```
 
 ---
 
-## 🔧 Slash Commands (New Feature ✨)
+## ⚡ Slash Commands
 
-The bot now supports modern **slash commands** alongside traditional prefix commands for better user experience!
+> Most slash commands require **bot owner** or **server owner** permissions.
 
-### 📝 Moderation Slash Commands:
-- `/kick @user [reason]` - Kick users with reason logging
-- `/ban @user [reason]` - Ban users with reason logging
-- `/clear <amount>` - Bulk delete messages
-- `/unban <username/id>` - Remove users from ban list
-- `/setnick <new_name> [@user]` - Set user nicknames
-- `/role_give @user @role` - Give role to user
-- `/role_remove @user @role` - Remove role from user
+### Moderation
+| Command | Description |
+|---------|-------------|
+| `/kick @user [reason]` | Kick a user |
+| `/ban @user [reason]` | Ban a user |
+| `/unban <username/id>` | Remove from ban list |
+| `/clear <amount>` | Bulk delete messages |
+| `/setnick <name> [@user]` | Change nickname |
+| `/role_give @user @role` | Give role to user |
+| `/role_remove @user @role` | Remove role from user |
 
-### 🔊 Voice Channel Management:
-- `/move_all [channel]` - Move all members to a voice channel
-- `/move_user @user [channel]` - Move specific user to voice channel
-- `/moveme <channel>` - Move yourself to a voice channel
-- `/move_role @role [channel]` - Move all members with a role to voice channel
+### Voice
+| Command | Description |
+|---------|-------------|
+| `/move_all [channel]` | Move all members to a voice channel |
+| `/move_user @user [channel]` | Move a specific user |
+| `/moveme <channel>` | Move yourself |
+| `/move_role @role [channel]` | Move all members with a role |
 
-### ℹ️ Utility Slash Commands:
-- `/invite` - Get bot invite link for your server
-
-> ⚠️ **Note:** Most slash commands require **bot owner** or **server owner** permissions for security.
+### Utility
+| Command | Description |
+|---------|-------------|
+| `/sc` | Bot info & GitHub link |
+| `/invite` | Get bot invite link |
 
 ---
 
 ## 🎵 Music Commands
-- `!play <song>` — Play a song or add to queue 
-- `!skip` — Skip current song 
-- `!pause` — Pause playback 
-- `!resume` — Resume playback 
-- `!queue` — Show current queue 
-- `!stop` — Stop playback and clear queue 
-- `!leave` — Make the bot leave the voice channel 
+
+| Command | Description |
+|---------|-------------|
+| `!play <song or URL>` | Search YouTube and play — shows a select menu |
+| `!skip` | Skip the current song |
+| `!pause` | Pause playback |
+| `!resume` | Resume playback |
+| `!queue` | Show the song queue |
+| `!clearqueue` | Clear the queue |
+| `!stop` | Stop and clear the queue |
+| `!leave` | Disconnect from voice |
+
+> Music also includes interactive **Pause / Resume / Skip / Stop** buttons on the Now Playing message.
 
 ---
 
 ## 🛡️ Moderation Commands
-- `!ban @user [reason]` — Ban a member 
-- `!kick @user [reason]` — Kick a member 
-- `!timeout @user 30m [reason]` — Timeout a member 
-- `!slowmode 30s` — Set channel slowmode 
-- `!addrole @user @Role` — Add a role 
-- `!removerole @user @Role` — Remove a role 
-- `!setnick @user NewName` — Change nickname 
-- `!lock [#channel] [@role]` — Lock a channel 
-- `!unlock [#channel] [@role]` — Unlock a channel
-- `!nuke [channel]` - Clone and delete a channel to remove all messages
-- `!clone [channel]` - Clone a text channel
-- `!slowoff [channel]` - Remove slowmode from a channel
-- `!createrole <name> [hex color] [reason]` - Create a new role
-- `!deleterole @role` - Delete a role
-- `!resetnick @user` - Reset a member's nickname
-- `!mute @user [reason]` - Mute a member in text channels
-- `!unmute @user` - Unmute a member
-- `!clearwarns @user` - Clear all warnings for a member
+
+| Command | Description |
+|---------|-------------|
+| `!ban @user [reason]` | Ban a member |
+| `!kick @user [reason]` | Kick a member |
+| `!timeout @user 30m [reason]` | Timeout (1s/1m/1h/1d) |
+| `!mute @user [reason]` | Mute in text channels |
+| `!unmute @user` | Unmute |
+| `!warn @user [reason]` | Issue a warning |
+| `!warnings [@user]` | View warnings |
+| `!clearwarns @user` | Clear all warnings |
+| `!purge [amount]` | Delete messages (max 100) |
+| `!nuke [#channel]` | Clone & delete a channel |
+| `!clone [#channel]` | Clone a channel |
+| `!lock [#channel] [@role]` | Lock a channel |
+| `!unlock [#channel] [@role]` | Unlock a channel |
+| `!slowmode 30s` | Set slowmode |
+| `!slowoff [#channel]` | Remove slowmode |
+| `!addrole @user @role` | Add a role |
+| `!removerole @user @role` | Remove a role |
+| `!createrole <name> [color]` | Create a new role |
+| `!deleterole @role` | Delete a role |
+| `!setnick @user <name>` | Set nickname |
+| `!resetnick @user` | Reset nickname |
+| `!getroles [@user]` | List a user's roles |
+
+---
+
+## 🏆 Leveling & XP
+
+| Command | Description |
+|---------|-------------|
+| `!rank [@user]` | View your level, XP, and rank |
+| `!leaderboard` | View the top 10 most active members |
+
+Users automatically earn 15-25 XP per minute while chatting.
+
+---
+
+## 🎫 Tickets & 🎉 Giveaways
+
+| Command | Description |
+|---------|-------------|
+| `!ticket setup` | Create the "Create Ticket" panel |
+| `!ticket close` | Close a ticket (or use the button) |
+| `!gstart <time> <winners> <prize>` | Start a giveaway (e.g. `!gstart 1h 1w Nitro`) |
+| `!gend <msg_id>` | End a giveaway early |
+| `!greroll <msg_id>` | Reroll a giveaway winner |
 
 ---
 
 ## 🔒 Verification
-- **Roblox**: `!verifyroblox <username>` (Working ✅) 
-- **FiveM**: `!verifyfivem <username>` (Working ✅) 
-- **FiveM Server Status**: `!fivemserverlive [#channel]`
-- **SA:MP Status**: `!sampstatus` - Check SA:MP server status (But Under the maintenance ❌)
-- **SA:MP**: `!verifysamp <username>` (Under Maintenance ❌) 
-- **Valorant**: `!verifyvalo <Username#Tag>` (Under Maintenance ❌) 
+
+| System | Command | Status |
+|--------|---------|--------|
+| **Roblox** | `!verifyroblox <username>` | ✅ Working |
+| **FiveM** | `!verifyfivem <name or ID>` | ✅ Working |
+| **FiveM Live** | `!fivemserverlive [#channel]` | ✅ Working |
+| **SA:MP** | `!verifysamp <playername>` | ⚠️ Maintenance |
+| **SA:MP Status** | `!sampstatus` | ⚠️ Maintenance |
+| **Valorant** | `!verifyvalo <Name#Tag>` | ⚠️ Maintenance |
+
+Enable each system in your `.env` file.
 
 ---
 
-## 🎮 Owo Economy Games
-- `owo coinflip <amount> [heads/tails]` - Flip a coin with your coins
-- `owo slots <amount>` - Play slots with your coins
-- `owo daily` - Claim your daily coins (300-5000)
-- `owo balance [@user]` - Check coin balance
+## 🪙 Economy Commands (owo)
+
+| Command | Description |
+|---------|-------------|
+| `owo daily` | Claim 300–5000 coins daily |
+| `owo balance [@user]` | Check your balance |
+| `owo coinflip <amount> [heads/tails]` | Bet on a coin flip |
+| `owo slots <amount>` | Spin the slot machine |
 
 ---
 
-## 🎮 Fun & Game Commands
-- `!rps rock|paper|scissors` - Play Rock Paper Scissors
-- `!roll 2d20` - Roll dice in NdN format (alias: `!dice`)
-- `!flipcoin` - Flip a coin (alias: `!flip`)
-- `!guess 5` - Guess a number between 1 and 100
-- `!slap @user` - Slap someone!
-- `!kiss @user` - Kiss someone!
-- `!hug @user` - Hug someone!
+## 🎮 Fun Commands
+
+| Command | Description |
+|---------|-------------|
+| `!rps rock\|paper\|scissors` | Rock Paper Scissors |
+| `!roll [NdN]` | Roll dice (e.g. `!roll 2d20`) |
+| `!flipcoin` | Flip a coin |
+| `!guess <1-10>` | Guess the secret number |
+| `!8ball <question>` | Ask the magic 8-ball |
+| `!tictactoe @user` | Play Tic-Tac-Toe via buttons |
+| `!trivia` | Play a random trivia question |
+| `!slap @user` | Slap someone! |
+| `!kiss @user` | Kiss someone! |
+| `!hug @user` | Hug someone! |
 
 ---
 
-## 📆 Utility Commands
-- `!translate <target_lang> <text>` - Translate text to another language
-- `!weather <city>` - Get weather for a location
-- `!calculator <expression>` - Evaluate a math expression (alias: `!calc`)
-- `!remind <time> <message>` - Set a reminder
-- `!vc247` - Make the bot stay in voice channel 24/7
-- `!serverinfo` - Get server information
-- `!userinfo [@user]` - Get user information
-- `!avatar [@user]` - Get a user's avatar
-- `!poll "Question" "Option1" "Option2"` - Create a poll
+## 🔧 Utility Commands
+
+| Command | Description |
+|---------|-------------|
+| `!translate <lang> <text>` | Translate text |
+| `!weather <city>` | Current weather |
+| `!calc <expression>` | Math calculator |
+| `!poll "Q" "A" "B"` | Create a reaction poll |
+| `!remind <time> <msg>` | Set a reminder (e.g. `1h30m`) |
+| `!vc247` | Keep bot in VC 24/7 |
+| `!avatar [@user]` | Show user avatar |
+| `!serverinfo` | Server information |
+| `!userinfo [@user]` | User information |
+| `!afk [reason]` | Go AFK (notifies anyone who pings you) |
+| `!snipe` | Retrieve the last deleted message |
 
 ---
 
-## ⚠️ Current Status
-- **Roblox Verification**: **Working Perfectly** ✅ 
-- **FiveM Verification**: **Working (Improved)** ✅ 
-- **SA:MP, Valorant**: **Currently unavailable (fix in progress)** ❌ 
+## 📦 Requirements
 
----
-
-## 🚀 Future Updates
-- Advanced moderation tools 
-- New verification systems 
-- More fun commands & games 
-- Economy system improvements
+- **Python 3.10+**
+- **FFmpeg** (for music)
+- See [requirements.txt](requirements.txt) for Python packages
 
 ---
 
 ## 👤 Author
+
 **[y-nabeelxd](https://github.com/y-nabeelxd)**
 
-_If you like this project, star ⭐ the repository!_
+_If you like this project, give it a ⭐ star on GitHub!_
